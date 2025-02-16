@@ -1,6 +1,30 @@
 <?php
-require_once dirname(__FILE__).'/../libs/db/tables.php';
+/**
+ * 初期状態のデータベースを作成します。１度だけ実行する必要があります。
+ */
+require_once dirname(__FILE__).'/../../src/config.php';
+require_once dirname(__FILE__).'/../../src/db/tables.php';
+require_once dirname(__FILE__).'/../../src/response_builder.php';
 
+// use JsonPost;
+use Jsonpost\{EcdasSignedAccountRoot,JsonStorage,JsonStorageHistory,PropertiesTable,DbSpecTable,Config,IResponseBuilder,ErrorResponseBuilder};
+
+
+class SuccessResponseBuilder implements IResponseBuilder {
+    
+    public function __construct() {
+    }
+
+    public function sendResponse() {
+        header('Content-Type: application/json');
+        http_response_code(200);
+        
+        echo json_encode([
+            'success' => true,
+            'result'=>[]
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    }
+}
 
 class BenchmarkDatabaseSetup
 {
@@ -11,7 +35,7 @@ class BenchmarkDatabaseSetup
         $this->db = $db;
     }
 
-    public function setup(): bool
+    public function setup(): IResponseBuilder
     {
 
         $this->db->beginTransaction();
@@ -22,12 +46,10 @@ class BenchmarkDatabaseSetup
             
             // properties テーブルが存在しない場合、初期化を実行
             if ($result->fetch()) {
-                $this->db->rollBack();
-                return false;
+                throw new ErrorResponseBuilder("Already initialized.");
             }
             $t1=new PropertiesTable($this->db);
             $t1->createTable();
-            $t1->insert('version','jp.nyatla:llm-benchmark:1');
             $t3=new JsonStorage($this->db);
             $t3->createTable();
             $t4=new EcdasSignedAccountRoot($this->db);
@@ -37,28 +59,28 @@ class BenchmarkDatabaseSetup
 
             $t2=new DbSpecTable($this->db);
             $t2->createTable();
+
+            $t1->insert('version','jp.nyatla:jsonpost:1');
+
             $t2->insert(JsonStorage::VERSION, $t3->name);
             $t2->insert(EcdasSignedAccountRoot::VERSION,$t4->name);
             $t2->insert(JsonStorageHistory::VERSION,$t5->name);
             $this->db->commit();
-            return true;
+            return new SuccessResponseBuilder();
+        }catch(ErrorResponseBuilder $e){
+            $this->db->rollback();
+            return $e;
         }catch (Exception $e) {
             $this->db->rollback();
-            throw $e;
+            return new ErrorResponseBuilder($e->getMessage());
         }
     }
 }
 
 // SQLiteデータベースに接続
-$db = new PDO('sqlite:benchmark_data.db');
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 
 // データベースのセットアップ
 $setup = new BenchmarkDatabaseSetup($db);
-if($setup->setup()){
-    echo 'データベースを生成しました。';
-}else{
-    echo '初期化済です。';
-}
+$setup->setup()->sendResponse();
 
-?>

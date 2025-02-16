@@ -1,9 +1,17 @@
 <?php
 
-require_once (dirname(__FILE__) ."/../libs/db/tables.php");
-require_once (dirname(__FILE__) ."/../libs/utils.php");
-require_once (dirname(__FILE__) ."/../libs/response_builder.php");
+use Jsonpost\Config;
+/**
+ * 所定の書式に格納したJSONファイルのアップロードを受け付けます。
+ * 
+ */
+require_once (dirname(__FILE__) ."/../../src/config.php");
 
+require_once (dirname(__FILE__) ."/../../src/db/tables.php");
+require_once (dirname(__FILE__) ."/../../src/utils.php");
+require_once (dirname(__FILE__) ."/../../src/response_builder.php");
+
+use Jsonpost\{IResponseBuilder,ErrorResponseBuilder,EasyEcdsaStreamBuilderLite,EcdasSignedAccountRoot,JsonStorage,JsonStorageHistory};
 
 class SuccessResponseBuilder implements IResponseBuilder {
     private string $usr_uuid;
@@ -75,8 +83,8 @@ function uploadAPI($db,$request):IResponseBuilder
     return new SuccessResponseBuilder($ar_rec['uuid'],$js_rec['uuid']);
 }
 
-$db = new PDO('sqlite:benchmark_data.db');
-$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
+
 $db->beginTransaction();
 try{
     //前処理
@@ -85,7 +93,7 @@ try{
     $rawData = file_get_contents('php://input');
     // $rawData = file_get_contents('./upload_test.json');
     
-    if(strlen($rawData)>1024*256){
+    if(strlen($rawData)>Config::MAX_JSON_SIZE){
         throw new ErrorResponseBuilder("upload data too large.");
     }
     // JSONデータのデコード
@@ -96,6 +104,7 @@ try{
     }
     // アップロードAPI処理を呼び出す
     uploadAPI($db, $request)->sendResponse();
+    echo("pl");
     $db->commit();
 }catch(ErrorResponseBuilder $exception){
     $db->rollBack();
@@ -107,4 +116,3 @@ try{
 
 
 
-?>

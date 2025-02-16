@@ -1,7 +1,5 @@
-import os
 import ecdsa.util
 import os
-import json
 import hashlib
 from typing import Optional,Tuple,List
 from dataclasses import dataclass, field,InitVar
@@ -9,6 +7,8 @@ import ecdsa
 
 @dataclass(frozen=True)
 class EcdsaSignner:
+    """ ECDSAの署名、検証、復元機能を提供するラッパーです。
+    """
     _private_key:ecdsa.SigningKey=field(init=False)
     _recover_id:Optional[int]=field(init=False)
     src: InitVar[bytes|None] = None
@@ -25,9 +25,9 @@ class EcdsaSignner:
         """署名を生成して返す。署名はdata_to_signのSHA256ハッシュに対して行う。
         """
         sk = self._private_key
-        print("DTS",data_to_sign,len(data_to_sign))
+        # print("DTS",data_to_sign,len(data_to_sign))
         digest = hashlib.sha256(data_to_sign).digest()
-        print("IN-DIGEST",digest.hex())
+        # print("IN-DIGEST",digest.hex())
         # raw形式（固定長）の署名を生成（sigencode_string: 64バイト）
         # Kを固定すればrecoverの署名の出現順位を制御できるみたいだけど理屈がわからない。
         signature = sk.sign_digest(digest, sigencode=ecdsa.util.sigencode_string)
@@ -65,7 +65,7 @@ class EcdsaSignner:
 
 
 
-class EasyEcdsaStreamBuilder:
+class EasyEcdsaSignatureBuilder:
     """ パッケージ化したEcdsa署名文字列生成クラスです。
         署名、圧縮公開鍵、メッセージリカバリIDを一体化したバイトストリームを生成します。
     """
@@ -143,60 +143,23 @@ class EasyEcdsaStreamBuilder:
 
 
 
-# import unittest
-
-# class TestPubKeyCompression(unittest.TestCase):
-
-#     def test_compress_decompress(self):
-#         """ 圧縮・展開して元に戻ることを確認 """
-#         # 65バイトの非圧縮公開鍵（04 + x(32) + y(32)）
-#         uncompressed_pubkey = bytes.fromhex(
-#             "04f03ce7b379a0472534fb2a7c5c9b69008d0b02a77cf922a9aa59a98c9381eeed7315b166418e0574764d102d2234498629bb20257ef6d95060e951928da69d79"
-#         )
-#         # 先頭の 0x04 を除いた 64バイトの鍵
-#         pubkey_64 = uncompressed_pubkey[1:]
-
-#         # 圧縮
-#         compressed = EasyEcdsaStreamBuilder.compressPubKey(pubkey_64)
-#         self.assertEqual(len(compressed), 33)
-#         self.assertIn(compressed[0], (0x02, 0x03))  # 先頭は 0x02 or 0x03
-
-#         # 展開
-#         decompressed = EasyEcdsaStreamBuilder.decompress_pubkey(compressed)
-#         self.assertEqual(decompressed, uncompressed_pubkey)  # 元の値と一致
-
-#     def test_invalid_compress(self):
-#         """ 無効な入力を圧縮しようとするとエラー """
-#         with self.assertRaises(ValueError):
-#             EasyEcdsaStreamBuilder.compressPubKey(b'\x00' * 63)  # 64バイト未満
-
-#     def test_invalid_decompress(self):
-#         """ 無効な入力を展開しようとするとエラー """
-#         with self.assertRaises(ValueError):
-#             EasyEcdsaStreamBuilder.decompress_pubkey(b'\x04' + b'\x00' * 32)  # 先頭が 0x02/0x03 でない
-#         with self.assertRaises(ValueError):
-#             EasyEcdsaStreamBuilder.decompress_pubkey(b'\x02' + b'\x00' * 31)  # 33バイト未満
-
-# if __name__ == '__main__':
-#     unittest.main()
 
 
 
 
-# # for i in range(100):    
-# pk=bytes.fromhex("59a94c947057c92a4ebd2b6f85d90ff3a862e2bbc8df1a1eb0f68dee69634af9")
-# # pk=os.urandom(32)
-# eeesb=EasyEcdsaStreamBuilder(pk)
-# S=os.urandom(4)
-# print("sdata    ",S.hex())
-# ss=eeesb.encode(S)
-# print("encoded  ",ss.hex())
 
-a,d=EasyEcdsaStreamBuilder.decode(bytes.fromhex('5fde0a19900e5e3e943f501fdaa36e49ef53a3e2d31b0c58db6c5b636a1f0269d2c0b9341eddac35afe88e249b211ae8e50cb35cfa52be56d2b0472ba3e050a803f03ce7b379a0472534fb2a7c5c9b69008d0b02a77cf922a9aa59a98c9381eeed2f43a3f2'))
-# print("pubkey(O)",eeesb._ecs.public_key.hex())
-print("pubkey(R)",a.hex())
-print("pubkey(S)",EasyEcdsaStreamBuilder.compressPubKey(a).hex())
-print("ddata    ",d.hex())
+
+
+
+
+
+
+
+# a,d=EasyEcdsaSignatureBuilder.decode(bytes.fromhex('5fde0a19900e5e3e943f501fdaa36e49ef53a3e2d31b0c58db6c5b636a1f0269d2c0b9341eddac35afe88e249b211ae8e50cb35cfa52be56d2b0472ba3e050a803f03ce7b379a0472534fb2a7c5c9b69008d0b02a77cf922a9aa59a98c9381eeed2f43a3f2'))
+# # print("pubkey(O)",eeesb._ecs.public_key.hex())
+# print("pubkey(R)",a.hex())
+# print("pubkey(S)",EasyEcdsaSignatureBuilder.compressPubKey(a).hex())
+# print("ddata    ",d.hex())
 
 # assert(a.hex()==eeesb._ecs.public_key.hex())
 
