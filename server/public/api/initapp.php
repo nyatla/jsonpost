@@ -38,7 +38,7 @@ class BenchmarkDatabaseSetup
     public function setup(): IResponseBuilder
     {
 
-        $this->db->beginTransaction();
+        $this->db->exec('BEGIN IMMEDIATE');
         try{
             // テーブルがすでに存在するかを確認
             $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
@@ -65,13 +65,13 @@ class BenchmarkDatabaseSetup
             $t2->insert(JsonStorage::VERSION, $t3->name);
             $t2->insert(EcdasSignedAccountRoot::VERSION,$t4->name);
             $t2->insert(JsonStorageHistory::VERSION,$t5->name);
-            $this->db->commit();
+            $this->db->exec("COMMIT");
             return new SuccessResponseBuilder();
         }catch(ErrorResponseBuilder $e){
-            $this->db->rollback();
+            $this->db->exec("ROLLBACK");
             return $e;
         }catch (Exception $e) {
-            $this->db->rollback();
+            $this->db->exec("ROLLBACK");
             return new ErrorResponseBuilder($e->getMessage());
         }
     }

@@ -86,7 +86,7 @@ function uploadAPI($db,$request):IResponseBuilder
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 
-$db->beginTransaction();
+$db->exec('BEGIN IMMEDIATE');
 try{
     //前処理
     
@@ -105,13 +105,12 @@ try{
     }
     // アップロードAPI処理を呼び出す
     uploadAPI($db, $request)->sendResponse();
-    echo("pl");
-    $db->commit();
+    $db->exec("COMMIT");
 }catch(ErrorResponseBuilder $exception){
-    $db->rollBack();
+    $db->exec("ROLLBACK");
     $exception->sendResponse();
 }catch(Exception $exception){
-    $db->rollBack();
+    $db->exec("ROLLBACK");
     (new ErrorResponseBuilder("Internal Error"))->sendResponse();
 }
 

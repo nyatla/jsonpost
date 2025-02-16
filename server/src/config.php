@@ -18,6 +18,7 @@ namespace Jsonpost{
             $fpath=dirname(__FILE__).Config::DB_PATH;
             $db = new PDO("sqlite:$fpath");
             $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $db->setAttribute(PDO::ATTR_TIMEOUT, 10);
             return $db;
         }
     
