@@ -2,6 +2,7 @@
 namespace Jsonpost{
     use \PDO as PDO;
     use \Exception as Exception;
+    use Ramsey\Uuid\Uuid;
 
     require_once dirname(__FILE__).'/nyatla_std_tables.php';
 
@@ -24,8 +25,8 @@ namespace Jsonpost{
             $sql = "
             CREATE TABLE IF NOT EXISTS $this->name (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pubkey TEXT NOT NULL,   --[RO] ecdasのrecoverkey[0]
-                uuid TEXT NOT NULL,     --[RO] ユーザー識別のためのuuid
+                pubkey BLOB NOT NULL,   --[RO] ecdasのrecoverkey[0]
+                uuid BLOB NOT NULL,     --[RO] ユーザー識別のためのuuid
                 nonce INTEGER NOT NULL,     --[RW] 署名データの下位8バイト(nonce)
                 status INTEGER DEFAULT 1    --[RW] 状態。1のみ
             );
@@ -46,11 +47,11 @@ namespace Jsonpost{
                 return $record;
             } else {
                 // レコードが存在しない場合、新しいレコードを挿入
-                $uuid = UUIDGenerator::generateV1();
+                $uuid = UUID::uuid7();
                 $nonce = 0; // nonce 初期値
             
                 // 新しいレコードを挿入
-                $this->insert($pubkey, $uuid, $nonce);
+                $this->insert($pubkey, $uuid->getBytes(), $nonce);
             
                 // 挿入したレコードのIDを取得
                 $insertedId = $this->db->lastInsertId();
@@ -65,7 +66,7 @@ namespace Jsonpost{
             }
         }
         // データ挿入
-        public function insert($pubkey, $uuid, $nonce)
+        public function insert(string $pubkey,string  $uuid,int $nonce)
         {
             $sql = "
             INSERT INTO $this->name (pubkey, uuid, nonce) VALUES (?, ?, ?);
@@ -131,8 +132,8 @@ namespace Jsonpost{
             $sql = "
             CREATE TABLE IF NOT EXISTS $this->name (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                uuid TEXT NOT NULL,                -- [RO]システム内の文章識別ID
-                hash TEXT NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
+                uuid BLOB NOT NULL,                -- [RO]システム内の文章識別ID
+                hash BLOB NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
                 json TEXT NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
             )";
             $this->db->exec($sql);
@@ -142,15 +143,15 @@ namespace Jsonpost{
         public function selectOrInsertIfNotExist(string $jsonData)
         {
             // jsonDataのSHA-256ハッシュを計算
-            $hash = hash('sha256', $jsonData); // JSONデータのSHA-256ハッシュ
+            $hash = hex2bin(hash('sha256', $jsonData)); // JSONデータのSHA-256ハッシュ
 
             // UUID v5を生成（URLの名前空間UUIDとjsonDataのSHA-256ハッシュを基に）
-            $uuid = UUIDGenerator::generateV1(); // 名前空間をURLとしてUUID v5を生成
+            $uuid = Uuid::uuid7(); // 名前空間をURLとしてUUID v5を生成
 
             // まず既存のレコードを検索
             $sql = "SELECT * FROM $this->name WHERE hash = :hash";
             $stmt = $this->db->prepare($sql);
-            $stmt->bindParam(':hash', $uuid);
+            $stmt->bindParam(':hash', $hash);
             $stmt->execute();
             $record = $stmt->fetch();
 
@@ -164,7 +165,7 @@ namespace Jsonpost{
                 VALUES (:uuid, :hash, :json)
                 ";
                 $stmtInsert = $this->db->prepare($sqlInsert);
-                $stmtInsert->bindParam(':uuid', $uuid);
+                $stmtInsert->bindParam(':uuid', $uuid->getBytes());
                 $stmtInsert->bindParam(':hash', $hash);
                 $stmtInsert->bindParam(':json', $jsonData);
                 $stmtInsert->execute();

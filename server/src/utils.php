@@ -191,9 +191,9 @@ namespace Jsonpost{
          * UUIDv1（タイムスタンプ+MACアドレス）を生成
          * @return string UUIDv1
          */
-        public static function generateV1()
+        public static function generateBinUuid()
         {
-            return Uuid::uuid1()->toString();
+            return Uuid::uuid7()->getBytes();
         }
 
         /**

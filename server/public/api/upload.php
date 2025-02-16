@@ -1,6 +1,7 @@
 <?php
 
 use Jsonpost\Config;
+use Ramsey\Uuid\Uuid;
 /**
  * 所定の書式に格納したJSONファイルのアップロードを受け付けます。
  * 
@@ -67,7 +68,7 @@ function uploadAPI($db,$request):IResponseBuilder
     }
     //ここから書込み系の
     $ar_tbl=new EcdasSignedAccountRoot($db);
-    $ar_rec=$ar_tbl->selectOrInsertIfNotExist($pubkey);
+    $ar_rec=$ar_tbl->selectOrInsertIfNotExist(hex2bin($pubkey));
     #初めての場合はnonce=0
     $nonce=unpack('N', hex2bin(substr($payload,0,2*4)))[1];
     if($ar_rec['nonce']>=$nonce){
@@ -80,7 +81,7 @@ function uploadAPI($db,$request):IResponseBuilder
     $uh_tbl->insert($ar_rec['id'],$js_rec['id']);
     #nonce更新
     $ar_tbl->updateNonce($ar_rec['id'],$nonce);
-    return new SuccessResponseBuilder($ar_rec['uuid'],$js_rec['uuid']);
+    return new SuccessResponseBuilder(UUID::fromBytes($ar_rec['uuid'])->toString(),UUID::fromBytes($js_rec['uuid'])->toString());
 }
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
