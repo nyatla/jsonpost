@@ -5,23 +5,26 @@ JSONPOSTの公開するWebAPIを通じて、ユーザーから送付されるJSO
 
 ユーザーの識別は行いますが、管理は省略されているため、ユーザーの登録などの面倒な作業が不要です。
 
+安いPHPサーバーで動作するように設計されています。
+
+
 
 ## 機能
 - データの蓄積・参照機能
 - アップロードユーザーの識別機能
 - ECDSA署名によるユーザー管理、詐称防止機能
-- サマリーの作成機能（オプション）
+- ハッシングによるいたずら対策(OPTION)
 
 
-サーバはPHPとsqlite3、クライアントはpython3で実装されています。
+サーバはPHPとsqlite3です。
+クライアントはpython3のサンプルがあります。
+
 
 
 
 # 方式
 ユーザーがECDSA秘密鍵を生成し、署名とともにサーバーにJSONを送付します。
 サーバーは公開鍵とJSONのハッシュでユーザーとドキュメントを結び付け、蓄積します。
-
-
 
 
 
@@ -121,8 +124,8 @@ pubkeyは圧縮したrecoverkey[0]です。
 ```
 CREATE TABLE json_storage (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    uuid TEXT NOT NULL,                -- [RO]システム内の文章識別ID
-    hash TEXT NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
+    uuid BLOB NOT NULL,                -- [RO]システム内の文章識別ID
+    hash BLOB NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
     json TEXT NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
 );
 ```
@@ -131,7 +134,7 @@ CREATE TABLE json_storage (
 
 ### json_storage_history
 ```
-CREATE TABLE json_storage (
+CREATE TABLE json_storage_history (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     created_date INTEGER NOT NULL,     -- [RO]データの投入時刻（UNIXタイムスタンプを想定）
     id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
@@ -221,8 +224,6 @@ account_rootに存在しないアカウントの場合はアカウントを登�
 json_storageに存在しない文章ならjson_storageにJSONを格納します。
 json_holderにアカウントと文章idペアを登録します。
 
-可能であればjson_summary_tableを更新してください。
-
 
 ```
 POST　/upload
@@ -275,4 +276,76 @@ POST　/upload
 ユーザーのuuidは自動で採番します。ドキュメントのuuidはドキュメントのハッシュから生成します。
 
 
+
+## /jsonlist
+
+JSONドキュメントの検索APIです。
+
+**パラメータ**
+- index|page|uuid
+- limit
+
+
+返されるデータは、uuid,ダイジェストです。
+返却数の最大はlimitで指定します。省略した場合はlimit=100です。
+
+指定できるパラメータは３種類あります。
+
+- index 登録順に先頭からの番号を返します。
+
+- page indexの亜種です。limitと組み合わせて、limit*pageをインデクスとして計算します。
+
+- uuid ドキュメントuuidをキーとして検索し、それ以降に登録された項目を返します。
+
+未実装
+
+- account アカウントのuuidまたはパブリックキーで登録されたドキュメントを返します。
+- title 先頭からN文字をタイトルとして文字列で追記します。
+
+いずれか一つのパラメータを指定できます。省略された場合はindex=0です。
+
+
+
+
+index,page,uuid_afterはlimitを指定できます。
+
+全て省略時はindex=0,limit=100です。
+
+
+```
+GET /getjsonentries.php
+```
+
+**成功**
+```
+{
+    "success":true,
+    "items":[
+        [created_date_int,uuid,document_hash]
+    ],
+    "index":[返却値の始点]
+    "total":[対象レコードの総数]
+
+}
+```
+
+totalとindexは呼出し毎に異なる場合があります。
+
+## /jsonitem
+
+JSONドキュメントの参照APIです
+
+- uuid
+- rawjson 指定するとjson部分だけが返ります。
+
+**成功**
+```
+{
+    "success":true,
+    "result":{
+        "uuid":[ドキュメントのuuid],
+        "json":[JSONドキュメント]
+    }
+}
+```
 

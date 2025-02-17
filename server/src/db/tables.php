@@ -2,9 +2,9 @@
 namespace Jsonpost{
     use \PDO as PDO;
     use \Exception as Exception;
-    use Ramsey\Uuid\Uuid;
 
     require_once dirname(__FILE__).'/nyatla_std_tables.php';
+    require_once dirname(__FILE__).'/../utils.php';
 
 
     class EcdasSignedAccountRoot
@@ -25,8 +25,8 @@ namespace Jsonpost{
             $sql = "
             CREATE TABLE IF NOT EXISTS $this->name (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pubkey BLOB NOT NULL,   --[RO] ecdasのrecoverkey[0]
-                uuid BLOB NOT NULL,     --[RO] ユーザー識別のためのuuid
+                pubkey BLOB NOT NULL UNIQUE,   --[RO] ecdasのrecoverkey[0]
+                uuid BLOB NOT NULL UNIQUE,     --[RO] ユーザー識別のためのuuid
                 nonce INTEGER NOT NULL,     --[RW] 署名データの下位8バイト(nonce)
                 status INTEGER DEFAULT 1    --[RW] 状態。1のみ
             );
@@ -47,11 +47,11 @@ namespace Jsonpost{
                 return $record;
             } else {
                 // レコードが存在しない場合、新しいレコードを挿入
-                $uuid = UUID::uuid7();
+                $uuid = UuidWrapper::create7();
                 $nonce = 0; // nonce 初期値
             
                 // 新しいレコードを挿入
-                $this->insert($pubkey, $uuid->getBytes(), $nonce);
+                $this->insert($pubkey, $uuid->asBytes(), $nonce);
             
                 // 挿入したレコードのIDを取得
                 $insertedId = $this->db->lastInsertId();
@@ -132,9 +132,9 @@ namespace Jsonpost{
             $sql = "
             CREATE TABLE IF NOT EXISTS $this->name (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                uuid BLOB NOT NULL,                -- [RO]システム内の文章識別ID
-                hash BLOB NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
-                json TEXT NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
+                uuid BLOB NOT NULL UNIQUE,         -- [RO]システム内の文章識別ID
+                hash BLOB NOT NULL UNIQUE,         -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
+                json JSON NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
             )";
             $this->db->exec($sql);
         }
@@ -146,7 +146,7 @@ namespace Jsonpost{
             $hash = hex2bin(hash('sha256', $jsonData)); // JSONデータのSHA-256ハッシュ
 
             // UUID v5を生成（URLの名前空間UUIDとjsonDataのSHA-256ハッシュを基に）
-            $uuid = Uuid::uuid7(); // 名前空間をURLとしてUUID v5を生成
+            $uuid = UuidWrapper::create7(); // 名前空間をURLとしてUUID v5を生成
 
             // まず既存のレコードを検索
             $sql = "SELECT * FROM $this->name WHERE hash = :hash";
@@ -162,10 +162,11 @@ namespace Jsonpost{
                 // レコードが存在しなければ挿入
                 $sqlInsert = "
                 INSERT INTO $this->name (uuid, hash, json)
-                VALUES (:uuid, :hash, :json)
+                VALUES (:uuid, :hash, json(:json))
                 ";
                 $stmtInsert = $this->db->prepare($sqlInsert);
-                $stmtInsert->bindParam(':uuid', $uuid->getBytes());
+                $uuid_v=$uuid->asBytes();
+                $stmtInsert->bindParam(':uuid', $uuid_v);
                 $stmtInsert->bindParam(':hash', $hash);
                 $stmtInsert->bindParam(':json', $jsonData);
                 $stmtInsert->execute();
@@ -182,6 +183,41 @@ namespace Jsonpost{
                 return $stmt->fetch(PDO::FETCH_ASSOC);
             }
         }
+        public function selectByUuid(string $uuid): array
+        {
+            // 最初に、uuidが一致するレコードのindexを取得する
+            $indexSql = "
+            SELECT *
+            FROM $this->name
+            WHERE hex(uuid) == :uuid;
+            ";
+            // echo(strtoupper(bin2hex($uuid)));        
+            // $this->db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+            $stmt = $this->db->prepare($indexSql);
+            $t=strtoupper(bin2hex($uuid));
+            $stmt->bindValue(':uuid', $t, PDO::PARAM_STR);
+            // $stmt->debugDumpParams();
+            $stmt->execute();
+
+            // 結果を取得
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // レコードが存在しない場合は例外をスロー
+            if (!$result) {
+                throw new Exception("レコードが見つかりませんでした。UUID: $t");
+            }
+            return $result;
+
+            
+        
+            // // 結果を返す
+            // return [
+            //     'items' => $items,
+            //     'total' => (int)$total,  // レコードの総数
+            // ];
+       }
+
+
     }
     
     class JsonStorageHistory

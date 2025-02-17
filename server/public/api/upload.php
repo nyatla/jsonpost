@@ -1,18 +1,20 @@
 <?php
 
 use Jsonpost\Config;
-use Ramsey\Uuid\Uuid;
+
 /**
  * 所定の書式に格納したJSONファイルのアップロードを受け付けます。
  * 
  */
 require_once (dirname(__FILE__) ."/../../src/config.php");
-
 require_once (dirname(__FILE__) ."/../../src/db/tables.php");
 require_once (dirname(__FILE__) ."/../../src/utils.php");
 require_once (dirname(__FILE__) ."/../../src/response_builder.php");
 
-use Jsonpost\{IResponseBuilder,ErrorResponseBuilder,EasyEcdsaStreamBuilderLite,EcdasSignedAccountRoot,JsonStorage,JsonStorageHistory};
+use Jsonpost\{
+    IResponseBuilder,ErrorResponseBuilder,
+    EasyEcdsaStreamBuilderLite,EcdasSignedAccountRoot,UuidWrapper,
+    JsonStorage,JsonStorageHistory};
 
 class SuccessResponseBuilder implements IResponseBuilder {
     private string $usr_uuid;
@@ -43,7 +45,7 @@ class SuccessResponseBuilder implements IResponseBuilder {
 }
 
 // アップロードAPIの処理
-function uploadAPI($db,$request):IResponseBuilder
+function apiMain($db,$request):IResponseBuilder
 {
     // 1. リクエストの検証
     $version = $request['version'] ?? null;
@@ -81,7 +83,9 @@ function uploadAPI($db,$request):IResponseBuilder
     $uh_tbl->insert($ar_rec['id'],$js_rec['id']);
     #nonce更新
     $ar_tbl->updateNonce($ar_rec['id'],$nonce);
-    return new SuccessResponseBuilder(UUID::fromBytes($ar_rec['uuid'])->toString(),UUID::fromBytes($js_rec['uuid'])->toString());
+    $u1=UuidWrapper::loadFromBytes($ar_rec['uuid']);
+    $u2=UuidWrapper::loadFromBytes($js_rec['uuid']);
+    return new SuccessResponseBuilder($u1->asText(),$u2->asText());
 }
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
@@ -107,7 +111,7 @@ try{
         throw new ErrorResponseBuilder("Invalid JSON format.");
     }
     // アップロードAPI処理を呼び出す
-    uploadAPI($db, $request)->sendResponse();
+    apiMain($db, $request)->sendResponse();
     $db->exec("COMMIT");
 }catch(ErrorResponseBuilder $exception){
     $db->exec("ROLLBACK");
@@ -115,6 +119,8 @@ try{
 }catch(Exception $exception){
     $db->exec("ROLLBACK");
     (new ErrorResponseBuilder("Internal Error"))->sendResponse();
+}catch(Error $e){
+    (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
 }
 
 

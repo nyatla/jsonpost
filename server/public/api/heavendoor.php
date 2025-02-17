@@ -6,9 +6,13 @@ require_once dirname(__FILE__).'/../../src/config.php';
 require_once dirname(__FILE__).'/../../src/db/tables.php';
 require_once dirname(__FILE__).'/../../src/utils.php';
 require_once dirname(__FILE__).'/../../src/response_builder.php';
+require_once dirname(__FILE__).'/../../src/db/views/JsonStorageView.php';
 
 // use JsonPost;
-use Jsonpost\{EcdasSignedAccountRoot,EasyEcdsaStreamBuilderLite,JsonStorage,JsonStorageHistory,PropertiesTable,DbSpecTable,Config,IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\{
+    EcdasSignedAccountRoot,EasyEcdsaStreamBuilderLite,
+    JsonStorage,JsonStorageHistory,PropertiesTable,DbSpecTable,JsonStorageView,
+    Config,IResponseBuilder,ErrorResponseBuilder};
 
 
 class SuccessResponseBuilder implements IResponseBuilder {
@@ -31,7 +35,7 @@ class SuccessResponseBuilder implements IResponseBuilder {
 
 
 
-function setup($db,$request): IResponseBuilder
+function apiMain($db,$request): IResponseBuilder
 {
     $version = $request['version'] ?? null;
     $signature = $request['signature'] ?? null;
@@ -82,6 +86,10 @@ function setup($db,$request): IResponseBuilder
     $t2->insert(JsonStorage::VERSION, $t3->name);
     $t2->insert(EcdasSignedAccountRoot::VERSION,$t4->name);
     $t2->insert(JsonStorageHistory::VERSION,$t5->name);
+
+    $v=new JsonStorageView($db);
+    $v->createView();
+
     return new SuccessResponseBuilder($pubkey);
 
 }
@@ -111,7 +119,7 @@ try{
             }
             // データベースのセットアップ
             
-            setup($db,$request)->sendResponse();
+            apiMain($db,$request)->sendResponse();
             break;
         }
         default:{
@@ -125,4 +133,7 @@ try{
 }catch (Exception $e) {
     $db->exec("ROLLBACK");
     (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+}catch(Error $e){
+    (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
 }
+
