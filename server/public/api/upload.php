@@ -89,6 +89,9 @@ $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 $db->exec('BEGIN IMMEDIATE');
 try{
     //前処理
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        throw new ErrorResponseBuilder("Method Not Allowed",405);
+    }
     
     // POSTリクエストからJSONデータを取得
     $rawData = file_get_contents('php://input');

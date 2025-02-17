@@ -54,13 +54,15 @@ class AppConfig:
     def ECDAS_NONCE_SIGN_S64P33N4(self,nonce:Optional[int])->str:
         essb=EasyEcdsaSignatureBuilder(self.private_key)
         if nonce is None:
-            start_time = datetime(2000, 1, 1, 0, 0)
-            current_time = datetime.now()
+            start_time = datetime.datetime(2000, 1, 1, 0, 0)
+            current_time = datetime.datetime.now()
             elapsed_time = (current_time - start_time).total_seconds()
             # UINT32として格納できる範囲に収める
             nonce = int(elapsed_time) % (2**32)
         return essb.encode(struct.pack('>I', nonce)).hex()
-
+    def ECDAS_NONCE_SIGN_S64P33PX(self,messgae:bytes)->str:
+        essb=EasyEcdsaSignatureBuilder(self.private_key)
+        return essb.encode(messgae).hex()
 
 class CommandBase:
     def __init__(self, args):
@@ -143,7 +145,7 @@ class UploadCommand(CommandBase):
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.args.endpoint}/upload.php"
         print(f"Uploading to {ep}...")
-        response = requests.post(ep, data=d_json, headers=headers)
+        response = requests.post(ep, data=d_json.encode("utf-8"), headers=headers)
 
 
         # 結果の表示
@@ -172,13 +174,40 @@ class UploadCommand(CommandBase):
 
 
 
-# class InitDbCommand(CommandBase):
-#     def execute(self):
-#         print("Initializing settings...")
+class AdminKonnichiwaCommand(CommandBase):
+    def execute(self):
+        # 設定ファイルの読み込み
+        config = AppConfig.load(self.args.config)
+        data = {
+            "version": "urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
+            "signature": config.ECDAS_NONCE_SIGN_S64P33PX("konnichiwa".encode())
+        }
+        d_json=json.dumps(data, ensure_ascii=False)
+        # ヘッダーの指定（charset=utf-8を指定）
+        headers = {
+            "Content-Type": "application/json; charset=utf-8"
+        }
 
-#     @classmethod
-#     def add_arguments(cls, subparsers):
-#         subparsers.add_parser("initdb", help="Initialize settings").set_defaults(func=InitCommand)
+        # アップロード先のエンドポイントに対してPOSTリクエストを送信
+        ep=f"{self.args.endpoint}/heavendoor.php?konnichiwa"
+        print(f"Uploading to {ep}...")
+        response = requests.post(ep, data=d_json, headers=headers)
+
+
+        # 結果の表示
+        print(f"Response Status Code: {response.status_code}")
+        print(f"Response Content: {response.content.decode('utf-8')}")        
+
+
+
+    @classmethod
+    def add_arguments(cls, subparsers):
+        sp=subparsers.add_parser("konnichiwa", help="Initialize server database.")
+        # upload コマンドの後に指定されるデータ
+        sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
+        sp.add_argument("--config", nargs='?', type=str, default=DEFAULT_CONFIG_NAME, help="The file of client configuration.")
+        sp.set_defaults(func=AdminKonnichiwaCommand)
+
 
 class VersionCommand(CommandBase):
     def execute(self):
@@ -205,7 +234,7 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     # コマンドクラスをリストで登録
-    commands = [InitCommand,UploadCommand, VersionCommand]
+    commands = [InitCommand,UploadCommand, VersionCommand,AdminKonnichiwaCommand]
 
     # 各コマンドクラスの引数設定を追加
     for command in commands:
@@ -215,9 +244,10 @@ def main():
     
     # args = parser.parse_args("version http://127.0.0.1:8000/api".split(" "))
     # args = parser.parse_args("init".split(" "))
-    # args = parser.parse_args("upload http://127.0.0.1:8000/api {\"key\":\"value\"} --config ./jsonpost.cfg.json --nonce 12345 --verbose".split(" "))
-    # args = parser.parse_args("upload http://127.0.0.1:8000/api -j {\"key\":\"valuew\"} --config ./jsonpost.cfg.json --nonce 12346 --verbose".split(" "))
-    args = parser.parse_args("upload http://127.0.0.1:8000/api -f ./jsonpost.cfg.json --config ./jsonpost.cfg.json --nonce 12347 --verbose".split(" "))
+    args = parser.parse_args("upload http://127.0.0.1:8000/api {\"key\":\"valueあああ\"} --config ./jsonpost.cfg.json --verbose".split(" "))
+    # args = parser.parse_args("upload http://127.0.0.1:8000/api -j {\"key\":\"valuew\"} --config ./jsonpost.cfg.json --nonce 12357 --verbose".split(" "))
+    # args = parser.parse_args("upload http://127.0.0.1:8000/api -f ./jsonpost.cfg.json --config ./jsonpost.cfg.json --nonce 12349 --verbose".split(" "))
+    # args = parser.parse_args("konnichiwa http://127.0.0.1:8000/api".split(" "))
 
     # 実行するコマンドを決定
     if args.command:

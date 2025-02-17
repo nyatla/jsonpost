@@ -8,7 +8,7 @@ use Jsonpost\Config;
 require_once (dirname(__FILE__) ."/../../src/config.php");
 require_once (dirname(__FILE__) ."/../../src/response_builder.php");
 
-use Jsonpost\{IResponseBuilder};
+use Jsonpost\{IResponseBuilder,ErrorResponseBuilder};
 
 class SuccessResponseBuilder implements IResponseBuilder {
     
@@ -28,6 +28,10 @@ class SuccessResponseBuilder implements IResponseBuilder {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    (new ErrorResponseBuilder("Method Not Allowed",405))->sendResponse();
+}else{
+    (new SuccessResponseBuilder())->sendResponse();
+}
 
-(new SuccessResponseBuilder())->sendResponse();
 

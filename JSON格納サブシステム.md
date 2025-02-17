@@ -38,6 +38,7 @@ JSONPOSTの公開するWebAPIを通じて、ユーザーから送付されるJSO
 - 署名検証に成功した場合、文章と登録日時が記録されます。初回はユーザーも同時に登録されます。
 
 ### 署名形式
+
 **署名方式: ECDAS-NONCE-SIGN-S64P33N4**
 
 この署名はアップロード操作に使う署名です。秘密鍵生成者の証明のみを目的としています。
@@ -61,9 +62,29 @@ ECDSAの署名、公開鍵に、32bitNONCEを加えたバイトストリーム�
 Nonceの初期値は 0 です。採番方式はクライアントに依存します。代表的な方式として、記録なし採番の場合、2000年1月1日からの経過秒数を基に行います。この場合、1分間あたり60トランザクションを処理可能で、2000年1月1日から約 2156年2月7日にかけて使用可能です（この日を過ぎると、非対応となります）。記録ありの場合、最大で 4294967295回 使用可能です。nonceを意図的に最大値にすることで、機能を無効化できます。
 
 
+**署名方式: ECDAS-NONCE-SIGN-S64P33PX**
+この署名はペイロードを送信する署名です。
+ECDSAの署名、公開鍵に、Xバイトのバイト列が続くきます。
+
+Xのバイト列をメッセージとして署名します。
 
 
-## データベース
+
+# データベース
+
+
+## システムテーブル
+システムテーブルとして、Nyatla.jpDB管理テーブル標準規格2024のテーブルがあります。
+
+### properties
+以下の値を格納します。
+rootkey hexstr 管理者のpublicキー
+
+
+
+##　アプリケーションテーブル
+
+
 
 ユーザーテーブルとして、以下のテーブルを定義します。
 
@@ -72,6 +93,7 @@ Nonceの初期値は 0 です。採番方式はクライアントに依存しま
 - json_storage
   JSONデータを格納します。
 - json_history
+
 
 
 
@@ -154,12 +176,44 @@ GET version.php
     }
 }
 ```
-## /initapp
-初期状態のデータベースを作成します。このAPIは１度しか成功しません。
+## /heavendoor
+初期状態のデータベースを作成し、公開鍵を管理者として登録します。このAPIは１度しか成功しません。
+
+```
+POST　/heavendoor?konnichiwa
+{
+    "version":"urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
+    "signature":[:ECDAS-NONCE-SIGN-S64P33PX:],
+    "params":{
+        <!-- "hashprefix":"jsonpost",
+        "difficality":3 -->
+    }
+}
+```
+[:ECDAS-NONCE-SIGN-S64P33PX:]は、メッセージに"konnichiwa"を指定します。
+**成功**
+```
+{
+    "success":true,
+    "result":{
+        "godkey":[登録された公開鍵]
+    }
+}
+```
+この公開鍵は管理者機能を使うために必要です。
+
+
+**失敗**
+```
+{
+    "success":false,
+    "message":""
+}
+```
 
 
 
-## upload API
+## /upload
 
 アップロードAPIは、クライアントから検証文字列とJSONデータを受け取ります。
 
@@ -174,13 +228,11 @@ json_holderにアカウントと文章idペアを登録します。
 POST　/upload
 {
     "version":"urn::nyatla.jp:json-request::ecdas-signed-upload:1",
-    "signature":[:ECDAS-NONCE-SIGN-R224N32:],
+    "signature":[:ECDAS-NONCE-SIGN-S64P33N4:],
     "data":[:JSON:]
 }
-
-
-
 ```
+
 **成功**
 ```
 {
@@ -224,28 +276,3 @@ POST　/upload
 
 
 
-
-
-
-remove
-
-GET [endpoint]/remove
-
-
-list
-
-GET list [endpoint]/list?page=?
-
-100件づつ日付順にリストを返す。
-Response
-{   "created_date":"date"
-    "page":0
-    "items":[
-        {"uuid":uuid,"created_date"}
-        :
-
-    ]
-}
-
-
-GET read [endpoint]/list?uuid
