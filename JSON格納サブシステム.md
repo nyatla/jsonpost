@@ -22,9 +22,6 @@ JSONPOSTの公開するWebAPIを通じて、ユーザーから送付されるJSO
 
 
 
-# 方式
-ユーザーがECDSA秘密鍵を生成し、署名とともにサーバーにJSONを送付します。
-サーバーは公開鍵とJSONのハッシュでユーザーとドキュメントを結び付け、蓄積します。
 
 
 
@@ -33,39 +30,53 @@ JSONPOSTの公開するWebAPIを通じて、ユーザーから送付されるJSO
 
 ## セキュリティ
 
+サーバーに書き込みを行う操作については、ユーザー側で生成したECDSA秘密鍵の署名と公開鍵で検証を行います。
+サーバーは公開鍵と内部識別子を結びつけ手管理します。
+
+
 ### リプレイプロテクション
-本システムは、**nonce**を利用したリプレイ攻撃防止機能を備えています。
+
+**nonce**を利用したリプレイ攻撃防止機能
 
 - **不正署名**の場合、登録は拒否されます。
 - **正式署名＋下位nonce**の登録は署名検証に失敗します。
 - 署名検証に成功した場合、文章と登録日時が記録されます。初回はユーザーも同時に登録されます。
 
-### 署名形式
+**PoW**を利用した連続アクセス防止機能
 
-**署名方式: ECDAS-NONCE-SIGN-S64P33N4**
+- 署名にハッシングパラメータを加えることで非対称な計算コストを発生させ、連続アクセスを防止します。
+- 規定に達しない署名は検証に成功しても受理されません。
+- 共通規定のほかに、アカウントの信頼度に合わせて規定を設定できます。
+  
+## 署名形式
+
+### ECDSA_SIGN_POW_S64K33N4P4
 
 この署名はアップロード操作に使う署名です。秘密鍵生成者の証明のみを目的としています。
-ECDSAの署名、公開鍵に、32bitNONCEを加えたバイトストリームです。ペイロードの詐称対策はできません。
+ECDSAの署名、公開鍵に、32bitNONCE、32bitのPOWパラメータを加えたバイトストリームです。ペイロードの詐称対策はできません。
 
 
-## 検証文字列の生成
+#### 検証文字列の生成
 1. メッセージを生成する。
-   4バイト32bit(BE)のnonce値(unsigned int)をMとする。
+   4バイト32bit(BE)のnonce値(unsigned int)をN4とする。
 2. 署名を生成する。
-   M256をecdsaで署名 A256=ecdsa(sha256(M))
+   N4のsha256ハッシュにecdsaで署名し、S64とする。
 3. 短縮publicキーを生成
-   33バイトの短縮pubキーをP33を生成する。
-4. バイト列を生成
-   A256,P33,Mを連結して検証文字列とする。
+   秘密鍵から33バイトの短縮pubキーK33に生成する。
+4. 署名バイト列を生成
+   S64、P33,N4を署名バイト列とする。
+5. PowのNonceを探索
+   S64K33N4に4バイトのPowパラメータP4を連結した値のsha256dを計算する。
+   末尾の連続する0ビットの数が規定値を超えるまで、N4を交換してハッシングする。
+6. 規定を超えたS64K33NP4を検証文字列とする。
 
-この検証文字列は、[:97]が署名、[97:101]が昇順のnonceとして機能します。
 
-## Nonceの値
+#### Nonceの値
 
 Nonceの初期値は 0 です。採番方式はクライアントに依存します。代表的な方式として、記録なし採番の場合、2000年1月1日からの経過秒数を基に行います。この場合、1分間あたり60トランザクションを処理可能で、2000年1月1日から約 2156年2月7日にかけて使用可能です（この日を過ぎると、非対応となります）。記録ありの場合、最大で 4294967295回 使用可能です。nonceを意図的に最大値にすることで、機能を無効化できます。
 
 
-**署名方式: ECDAS-NONCE-SIGN-S64P33PX**
+**署名方式: ECDAS_SIGN_S64P33X**
 この署名はペイロードを送信する署名です。
 ECDSAの署名、公開鍵に、Xバイトのバイト列が続くきます。
 
@@ -126,7 +137,7 @@ CREATE TABLE json_storage (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     uuid BLOB NOT NULL,                -- [RO]システム内の文章識別ID
     hash BLOB NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
-    json TEXT NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
+    json JSON NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
 );
 ```
 
@@ -186,14 +197,16 @@ GET version.php
 POST　/heavendoor?konnichiwa
 {
     "version":"urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
-    "signature":[:ECDAS-NONCE-SIGN-S64P33PX:],
+    "signature":[:ECDAS_SIGN_S64P33X:],
     "params":{
-        <!-- "hashprefix":"jsonpost",
-        "difficality":3 -->
+        "upload_pow_bits":16,
     }
 }
 ```
-[:ECDAS-NONCE-SIGN-S64P33PX:]は、メッセージに"konnichiwa"を指定します。
+[:ECDAS_SIGN_S64P33X:]は、メッセージに"konnichiwa"を指定します。
+
+- upload_pow_bits ECDAS-NONCE-SIGN-S64P33PX
+
 **成功**
 ```
 {
@@ -229,7 +242,7 @@ json_holderにアカウントと文章idペアを登録します。
 POST　/upload
 {
     "version":"urn::nyatla.jp:json-request::ecdas-signed-upload:1",
-    "signature":[:ECDAS-NONCE-SIGN-S64P33N4:],
+    "signature":[:ECDSA_SIGN_POW_S64K33N4P4:],
     "data":[:JSON:]
 }
 ```
@@ -261,19 +274,12 @@ POST　/upload
 - nonceが記録より若い
 - 署名検証の失敗
 - JSON形式のエラー
+- PoWランクの不足
 
 ## 処理手順
 
 登録データの検証は次のように行います。
-
-1. 検証文字列からpublicキーの候補を復元
-2. 復元したpublicキーをaccount_rootから検索し、ユーザーを特定。無ければ登録。
-3. 該当行のnonceを確認。
-4. data以下のhashを作成 ->jdigest
-5. jdigestをjson_strageから検索。無ければ登録。
-6. ユーザーuuid,ドキュメントuuidを返却。
-
-ユーザーのuuidは自動で採番します。ドキュメントのuuidはドキュメントのハッシュから生成します。
+アカウントとドキュメントのuuidはサーバーが採番します。
 
 
 
