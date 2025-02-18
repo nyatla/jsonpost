@@ -1,28 +1,34 @@
 <?php
 
-use Jsonpost\Config;
+
 
 /**
  * 所定の書式に格納したJSONファイルのアップロードを受け付けます。
  * 
  */
-require_once (dirname(__FILE__) ."/../../src/config.php");
-require_once (dirname(__FILE__) ."/../../src/db/tables.php");
-require_once (dirname(__FILE__) ."/../../src/utils.php");
-require_once (dirname(__FILE__) ."/../../src/response_builder.php");
+require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
-use Jsonpost\{
-    IResponseBuilder,ErrorResponseBuilder,
-    EasyEcdsaStreamBuilderLite,EcdasSignedAccountRoot,UuidWrapper,
-    JsonStorage,JsonStorageHistory};
+
+// use JsonPost;
+use Jsonpost\Config;
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\utils\ecdsasigner\{PowEcdsaSignatureBuilder};
+use Jsonpost\utils\{UuidWrapper};
+
+use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
+use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
+use Jsonpost\db\views\{JsonStorageView};
+
+
 
 class SuccessResponseBuilder implements IResponseBuilder {
     private string $usr_uuid;
     private string $doc_uuid;
-    
-    public function __construct(string $usr_uuid,string $doc_uuid) {
+    private int $powbits;
+    public function __construct(string $usr_uuid,string $doc_uuid,int $powbits) {
         $this->doc_uuid=$doc_uuid;
         $this->usr_uuid=$usr_uuid;
+        $this->powbits=$powbits;
     }
 
     public function sendResponse() {
@@ -33,11 +39,10 @@ class SuccessResponseBuilder implements IResponseBuilder {
             'success' => true,
             'result'=>[
                 'status'=>'created',
-                'user'=>[
-                    'uuid'=>$this->usr_uuid
-                ],
-                'document'=>[
-                    'uuid'=>$this->doc_uuid
+                'user_uuid'=>$this->usr_uuid,
+                'json_uuid'=>$this->doc_uuid,
+                'score'=>[
+                    'powbits'=>$this->powbits
                 ]
             ]
         ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
@@ -60,22 +65,31 @@ function apiMain($db,$request):IResponseBuilder
         throw new ErrorResponseBuilder("Invalid version");
     }
 
-    $pubkey=null;
-    $payload=null;
+    $pes=null;
     try{
         #署名からリカバリキーとnonceを取得
-        [$pubkey,$payload]=EasyEcdsaStreamBuilderLite::decode($signature);
+        $pes=PowEcdsaSignatureBuilder::decode($signature);
     } catch (Exception $e) {
         throw new ErrorResponseBuilder( "Invalid signature");
     }
+
+
     //ここから書込み系の
     $ar_tbl=new EcdasSignedAccountRoot($db);
-    $ar_rec=$ar_tbl->selectOrInsertIfNotExist(hex2bin($pubkey));
+
+    $ar_rec=$ar_tbl->selectOrInsertIfNotExist(($pes->ees->pubkey));
+
     #初めての場合はnonce=0
-    $nonce=unpack('N', hex2bin(substr($payload,0,2*4)))[1];
+    $nonce=unpack('N', string: hex2bin(substr($pes->ees->data,0,2*4)))[1];
     if($ar_rec['nonce']>=$nonce){
         throw new ErrorResponseBuilder("Invalid nonce. Current nonce={$ar_rec['nonce']}");
     }
+    $current_powbits=$pes->getPowBits();
+    // print("{$ar_rec['pow_bits_write']},{$pes->getPowBits()}\n");
+    if($ar_rec['pow_bits_write']>$current_powbits){
+        throw new ErrorResponseBuilder("Low powbits. Over {$ar_rec['pow_bits_write']} required.");
+    }
+
     #文章を登録
     $js_tbl=new JsonStorage($db);
     $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($jsonData,JSON_UNESCAPED_UNICODE));
@@ -85,7 +99,7 @@ function apiMain($db,$request):IResponseBuilder
     $ar_tbl->updateNonce($ar_rec['id'],$nonce);
     $u1=UuidWrapper::loadFromBytes($ar_rec['uuid']);
     $u2=UuidWrapper::loadFromBytes($js_rec['uuid']);
-    return new SuccessResponseBuilder($u1->asText(),$u2->asText());
+    return new SuccessResponseBuilder($u1->asText(),$u2->asText(),$current_powbits);
 }
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');

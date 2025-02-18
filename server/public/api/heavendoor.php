@@ -1,24 +1,29 @@
 <?php
+require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
+
+use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 /**
  * 初期状態のデータベースを作成します。１度だけ実行する必要があります。
  */
-require_once dirname(__FILE__).'/../../src/config.php';
-require_once dirname(__FILE__).'/../../src/db/tables.php';
-require_once dirname(__FILE__).'/../../src/utils.php';
-require_once dirname(__FILE__).'/../../src/response_builder.php';
-require_once dirname(__FILE__).'/../../src/db/views/JsonStorageView.php';
+
 
 // use JsonPost;
-use Jsonpost\{
-    EcdasSignedAccountRoot,EasyEcdsaStreamBuilderLite,
-    JsonStorage,JsonStorageHistory,PropertiesTable,DbSpecTable,JsonStorageView,
-    Config,IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\Config;
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\utils\ecdsasigner\{EasyEcdsaStreamBuilderLite};
+use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
+use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
+use Jsonpost\db\views\{JsonStorageView};
+
+
 
 
 class SuccessResponseBuilder implements IResponseBuilder {
     private string $godkey;
-    public function __construct($godkey) {
+    private array $params;
+    public function __construct($godkey,$params) {
         $this->godkey = $godkey;
+        $this->params=$params;
     }
 
     public function sendResponse() {
@@ -27,7 +32,8 @@ class SuccessResponseBuilder implements IResponseBuilder {
         
         echo json_encode([
             'success' => true,
-            'result'=>["godkey"=> $this->godkey],
+            'result'=>['godkey'=> $this->godkey],
+            'params'=>$this->params,
         ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
 }
@@ -39,25 +45,27 @@ function apiMain($db,$request): IResponseBuilder
 {
     $version = $request['version'] ?? null;
     $signature = $request['signature'] ?? null;
-    if (!$version || !$signature) {
+    $params = $request['params'] ?? null;
+    if (!$version || !$signature || !$params) {
         throw new ErrorResponseBuilder("Invalid input parameters.");
     }
     //versionチェック
     if($version!="urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1"){
         throw new ErrorResponseBuilder("Invalid version");
     }
+    $pow_bits_read=isset($params['pow_bits_read'])?intval($params['pow_bits_read']):0;
+    $pow_bits_write=isset($params['pow_bits_write'])?intval($params['pow_bits_write']):0;
 
     //署名を受け取る。ペイロードは"hello_jsonpost"
-    $pubkey=null;
-    $payload=null;
+    $ees=null;
     try{
         #署名からリカバリキーとnonceを取得
-        [$pubkey,$payload]=EasyEcdsaStreamBuilderLite::decode($signature);
-        if(hex2bin($payload)!=='konnichiwa'){
+        $ees=EasyEcdsaStreamBuilderLite::decode($signature);
+        if($ees->data!==bin2hex('konnichiwa')){
             throw new Exception();
         }
     } catch (Exception $e) {
-        throw new ErrorResponseBuilder( "Invalid signature");
+        throw new ErrorResponseBuilder( $e->getMessage());
     } 
 
     // テーブルがすでに存在するかを確認
@@ -81,7 +89,9 @@ function apiMain($db,$request): IResponseBuilder
     $t2->createTable();
 
     $t1->insert('version',Config::VERSION);
-    $t1->insert('god',$pubkey);
+    $t1->insert('god',$ees->pubkey);
+    $t1->insert('pow_bits_read',$pow_bits_read);
+    $t1->insert('pow_bits_write',$pow_bits_write);
 
     $t2->insert(JsonStorage::VERSION, $t3->name);
     $t2->insert(EcdasSignedAccountRoot::VERSION,$t4->name);
@@ -90,7 +100,7 @@ function apiMain($db,$request): IResponseBuilder
     $v=new JsonStorageView($db);
     $v->createView();
 
-    return new SuccessResponseBuilder($pubkey);
+    return new SuccessResponseBuilder($ees->pubkey,["pow_bits_read"=>$pow_bits_read,"pow_bits_write"=>$pow_bits_write]);
 
 }
 
@@ -134,6 +144,7 @@ try{
     $db->exec("ROLLBACK");
     (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
 }catch(Error $e){
+    // (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
     (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
 }
 

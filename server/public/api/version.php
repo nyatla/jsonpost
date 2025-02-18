@@ -1,14 +1,18 @@
 <?php
+require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
 use Jsonpost\Config;
 /**
  * 所定の書式に格納したJSONファイルのアップロードを受け付けます。
  * 
  */
-require_once (dirname(__FILE__) ."/../../src/config.php");
-require_once (dirname(__FILE__) ."/../../src/response_builder.php");
+// require_once dirname(__FILE__) ."/../../src/config.php";
+// require_once dirname(__FILE__) ."/../../src/response_builder.php";
 
-use Jsonpost\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\responsebuilder\{
+    IResponseBuilder,
+    ErrorResponseBuilder
+};
 
 class SuccessResponseBuilder implements IResponseBuilder {
     
