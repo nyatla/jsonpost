@@ -1,19 +1,20 @@
 <?php
+require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
-use Jsonpost\UuidWrapper;
-require_once dirname(__FILE__).'/../../src/config.php';
-require_once dirname(__FILE__).'/../../src/db/tables.php';
-require_once dirname(__FILE__).'/../../src/db/views/JsonStorageView.php';
-require_once dirname(__FILE__).'/../../src/utils.php';
-require_once dirname(__FILE__).'/../../src/response_builder.php';
-require_once dirname(__FILE__).'/../../src/db/views/JsonStorageView.php';
+use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
+/**
+ * 初期状態のデータベースを作成します。１度だけ実行する必要があります。
+ */
+
 
 // use JsonPost;
-use Jsonpost\{
-    // EcdasSignedAccountRoot,EasyEcdsaStreamBuilderLite,
-    JsonStorage,JsonStorageHistory,JsonStorageView,PropertiesTable,DbSpecTable,
-    Config,
-    IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\Config;
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\utils\ecdsasigner\{EasyEcdsaStreamBuilderLite};
+use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
+use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
+use Jsonpost\db\views\{JsonStorageView};
+use Jsonpost\utils\{UuidWrapper};
 
 
 /**

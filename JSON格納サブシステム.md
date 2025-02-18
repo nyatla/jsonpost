@@ -247,6 +247,9 @@ POST　/upload
     "result":{
         "user_uuid":[操作を行ったユーザーのUUID],
         "json_uuid":[ドキュメントのUUID],
+        "score":{
+            powbits:4
+        }
     }
 }
 ```
@@ -326,12 +329,12 @@ GET /getjsonentries.php
 
 totalとindexは呼出し毎に異なる場合があります。
 
-## /jsonitem
+## /jsondoc
 
 JSONドキュメントの参照APIです
 
 - uuid
-- rawjson 指定するとjson部分だけが返ります。
+- raw 指定するとjson部分だけが返ります。
 
 **成功**
 ```

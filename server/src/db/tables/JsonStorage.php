@@ -97,7 +97,8 @@ class JsonStorage
 
         // レコードが存在しない場合は例外をスロー
         if (!$result) {
-            throw new Exception("レコードが見つかりませんでした。UUID: $t");
+            $u=UuidWrapper::bin2text($uuid);
+            throw new Exception("No data. uuid:{$u}");
         }
         return $result;
 
