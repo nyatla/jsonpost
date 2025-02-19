@@ -142,7 +142,9 @@ CREATE TABLE json_storage_history (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     created_date INTEGER NOT NULL,     -- [RO]データの投入時刻（UNIXタイムスタンプを想定）
     id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
-    id_json_storage INTEGER NOT NULL   -- [RO]文章のID
+    id_json_storage INTEGER NOT NULL,   -- [RO]文章のID
+    opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
+    powbits INTEGER NOT NULL --[RO]登録時のPOWビット数
 );
 ```
 このテーブルはアカウントが投入したJSONとアカウントのIDペア、その投入を記録します。

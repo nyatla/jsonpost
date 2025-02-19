@@ -94,7 +94,7 @@ function apiMain($db,$request):IResponseBuilder
     $js_tbl=new JsonStorage($db);
     $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($jsonData,JSON_UNESCAPED_UNICODE));
     $uh_tbl=new JsonStorageHistory($db);
-    $uh_tbl->insert($ar_rec['id'],$js_rec['id']);
+    $uh_tbl->insert($ar_rec['id'],$js_rec['id'],0,$current_powbits);
     #nonce更新
     $ar_tbl->updateNonce($ar_rec['id'],$nonce);
     $u1=UuidWrapper::loadFromBytes($ar_rec['uuid']);
@@ -130,11 +130,13 @@ try{
 }catch(ErrorResponseBuilder $exception){
     $db->exec("ROLLBACK");
     $exception->sendResponse();
-}catch(Exception $exception){
+}catch(Exception $e){
     $db->exec("ROLLBACK");
-    (new ErrorResponseBuilder("Internal Error"))->sendResponse();
+    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+    // (new ErrorResponseBuilder("Internal Error"))->sendResponse();
 }catch(Error $e){
-    (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+    // (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
 }
 
 

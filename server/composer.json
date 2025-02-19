@@ -1,7 +1,6 @@
 {
     "require": {
         "ramsey/uuid": "^4.7",
-        "kornrunner/secp256k1": "^0.3.0",
         "simplito/elliptic-php": "^1.0"
     },
     "autoload": {

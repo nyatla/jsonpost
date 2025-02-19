@@ -23,22 +23,23 @@ class JsonStorageHistory
             created_date INTEGER NOT NULL,     -- [RO]データの投入時刻（UNIXタイムスタンプを想定）
             id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
             id_json_storage INTEGER NOT NULL,  -- [RO]文章のID
-            opcode INTEGER NOT NULL
+            opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
+            powbits INTEGER NOT NULL --[RO]登録時のPOWビット数
         );
         ";
 
         $this->db->exec($sql);
     }
     // データをjson_storageテーブルに挿入
-    public function insert(int $idAccount, int $idJsonStorage,int $opCode=0)
+    public function insert(int $idAccount, int $idJsonStorage,int $opCode,int $powbits)
     {
         // 現在のUnixタイムスタンプを取得
         $createdDate = time();
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode)
-        VALUES (:created_date, :id_account, :id_json_storage,:opcode);
+        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode,powbits)
+        VALUES (:created_date, :id_account, :id_json_storage,:opcode,:powbits);
         ";
 
         $stmt = $this->db->prepare($sql);
@@ -46,6 +47,7 @@ class JsonStorageHistory
         $stmt->bindParam(':id_account', $idAccount);
         $stmt->bindParam(':id_json_storage', $idJsonStorage);
         $stmt->bindParam(':opcode', $opCode);
+        $stmt->bindParam(':powbits', $powbits);
         $stmt->execute();
     }
 }
