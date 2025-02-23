@@ -104,4 +104,53 @@ class JsonStorage
     }
 
 
+    
+    public function countWithFilter(int $index, ?int $limit, ?string $path, ?string $value): array
+    {
+        // 絞り込み条件の追加（$path と $value が指定されている場合）
+        $filterCondition = '';
+        $params = [
+            ':index' => $index,
+            ':limit' => $limit ?? -1
+        ];
+        // $path と $value が指定されている場合、json_extractで絞り込み
+        if ($path && $value !== null) {
+            $filterCondition = " AND json_extract(json, :selector) = :value ";
+            $params[':selector'] = $path;
+            $params[':value'] = $value;
+        } elseif ($path) {
+            // $path が指定されているが、$value が指定されていない場合
+            $filterCondition = " AND json_extract(json, :selector) IS NOT NULL ";
+            $params[':selector'] = $path;
+        } elseif ($value) {
+            throw new Exception('Must be set path with value.');
+        }
+        // まず、指定された範囲内のレコードを絞り込み、総数を数える
+        $countSqlTotal = "SELECT COUNT(*) FROM (SELECT id FROM $this->name ORDER BY id LIMIT :limit OFFSET :index)";
+        $stmt = $this->db->prepare($countSqlTotal);
+        $stmt->bindValue(':index', $params[':index']);
+        $stmt->bindValue(':limit', $params[':limit']);
+        $stmt->execute();
+        $total = $stmt->fetchColumn();
+        $matched=$total;//検索式がない場合は全てマッチ
+        if(isset($params[':selector'])){
+            // 次に、範囲内のレコードのうち、絞り込み条件に合致するレコード数をカウント
+            $countSqlMatched = "SELECT COUNT(*) FROM (SELECT id FROM (SELECT * FROM $this->name ORDER BY id LIMIT :limit OFFSET :index) WHERE 1=1 $filterCondition)";
+            $stmt = $this->db->prepare($countSqlMatched);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->execute();
+            $matched = $stmt->fetchColumn();
+        }
+
+    
+    
+        // 結果を返す
+        return [
+            'matched' => (int)$matched,  // ページ内で絞り込んだレコード数（条件に合致したレコード数）
+            'total' => (int)$total,      // ページ内で絞り込んだレコード総数
+        ];
+    }
+
 }

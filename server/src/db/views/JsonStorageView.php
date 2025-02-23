@@ -38,43 +38,8 @@ class JsonStorageView
 
         $this->db->exec($sql);
     }
-    /**
-     * created_dateでソートしたテーブルのindex番目からlimit個を単純配列の配列にして返す。
-     * @param int $index
-     * @param int $limit
-     * @return void
-     */
-    public function selectByIndex(int $index, int $limit): array
-    {
-        // 1つ目のクエリ：レコードのデータ
-        $sql = "
-        SELECT 
-            id,
-            created_date, 
-            uuid, 
-            hash
-        FROM $this->name
-        ORDER BY created_date
-        LIMIT :limit OFFSET :index;
-        ";
-        // レコードデータの取得
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':index', $index, PDO::PARAM_INT);
-        $stmt->execute();
-        $items = $stmt->fetchAll(PDO::FETCH_NUM);  // 単純配列の配列
-        // 2つ目のクエリ：総レコード数
-        $countSql = "SELECT COUNT(*) FROM $this->name;";       
-        // 総レコード数の取得
-        $stmtCount = $this->db->query($countSql);
-        $total = $stmtCount->fetchColumn();
+
     
-        // 結果を返す
-        return [
-            'items' => $items,
-            'total' => (int)$total,  // レコードの総数
-        ];
-    }
     /**
      * 指定されたインデックス番号から、指定された件数のデータを取得し、さらに JSON カラムの絞り込みを行う関数です。
      *
@@ -116,11 +81,8 @@ class JsonStorageView
             created_date, 
             uuid, 
             hash
-        FROM $this->name
-        WHERE 1=1 $filterCondition
-        ORDER BY created_date
-        LIMIT :limit OFFSET :index;
-        ";
+        FROM (SELECT * FROM $this->name ORDER BY id LIMIT :limit OFFSET :index)
+        WHERE 1=1 $filterCondition;";
     
         // レコードデータの取得
         $stmt = $this->db->prepare($sql);

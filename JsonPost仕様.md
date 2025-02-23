@@ -351,10 +351,10 @@ GET version.php
 
 
 
-## /jsonlist
+## /list.php
 
 JSONドキュメントの検索APIです。
-返されるデータは、ドキュメントのuuidと作成日時です。
+ページネーションで指定した範囲にあるドキュメント情報をリストで返します。
 
 
 **パラメータ**
@@ -392,7 +392,7 @@ totalとindexは呼出し毎に異なる場合があります。
 
 
 ```
-GET /getjsonentries.php
+GET /list.php
 ```
 
 **成功**
@@ -411,8 +411,34 @@ GET /getjsonentries.php
 }
 ```
 
+## /count.php
 
-## /jsondoc
+JSONドキュメントの統計APIです。
+ページネーションで指定した範囲にあるドキュメントの統計を返します。
+
+
+
+**パラメータ**
+/list.phpと同一です。
+
+```
+GET /count.php
+```
+
+**成功**
+```
+{
+  "success": true,
+  "result": {
+    "matched": 24,
+    "total": 24
+  }
+}
+```
+
+
+
+## /json.php
 
 JSONドキュメントの参照APIです。
 
@@ -424,7 +450,7 @@ path値はphpのjsonpath拡張モジュールで処理します。これはsqlit
 
 
 ```
-GET /jsondoc.php?uuid=00000000-0000-0000-000000000000
+GET /json.php?uuid=00000000-0000-0000-000000000000
 ```
 
 **成功**
