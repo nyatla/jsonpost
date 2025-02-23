@@ -9,12 +9,49 @@ from dataclasses import dataclass, field
 from typing import ClassVar,Optional,List
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from libs.ecdsa_utils import PowEcdsaSignatureBuilder,EcdsaSignner,EasyEcdsaSignatureBuilder,PowEcdsaSignature
+from libs.powstamp import PowStampBuilder,PowStamp
+from libs.ecdsa_utils import EcdsaSignner
 
+
+
+import time
+
+class PerformanceTimer(object):
+    def __init__(self, verbose=True):
+        self.verbose = verbose
+
+    def __enter__(self):
+        self.start = time.time()
+        return self
+
+    def __exit__(self, *args):
+        self.end = time.time()
+        self.secs = self.end - self.start
+        self.msecs = self.secs * 1000  # millisecs
+        if self.verbose:
+            print('elapsed time: %f ms' %(self.msecs))
+    @property
+    def elapseInMs(self)->int:
+        end = time.time()
+        secs = end - self.start
+        return round(secs * 1000)  # millisecs
+        
+
+
+
+    
+        
+        
 
 
 class JsonpostCl:
     DEFAULT_CONFIG_NAME='./jsonpost.cfg.json'
+    # class ServerItem:
+    #     last_nonce:int
+    #     write_pow_bits:int
+    # class ServerList:
+    #     items:List[ServerItem]
+    #     def getByName(self,)
 
     @dataclass(frozen=True)
     class AppConfig:
@@ -26,7 +63,7 @@ class JsonpostCl:
         @classmethod
         def create(cls) -> "JsonpostCl.AppConfig":
             """AppConfigを生成し、設定ファイルに保存"""
-            # 署名鍵の生成（rawエンコード、通常は 64 バイトの固定長）
+            # 署名鍵の生成（rawエンコード、通常は 32 バイトの固定長）
             private_key = EcdsaSignner.generateKey()
             return cls(created_date=datetime.datetime.now(datetime.timezone.utc),private_key=private_key,params_pow_bits=0)
 
@@ -50,22 +87,20 @@ class JsonpostCl:
                 "created_at": self.created_date.strftime('%Y-%m-%dT%H:%M:%S%z'),  # タイムゾーン付きで保存
                 "params":{
                     "default_powbits":self.params_pow_bits
-                }
+                },
             }
             with open(fname, 'w') as f:
                 json.dump(config, f, indent=4)
-        def ECDSA_SIGN_POW_S64K33N4P4(self,nonce:Optional[int],pow_bits:int)->PowEcdsaSignature:
-            essb=PowEcdsaSignatureBuilder(self.private_key)
+        def generatePoWStamp(self,nonce:Optional[int],server_domain:Optional[str],payload:Optional[bytes],target_pow_score:int)->PowStamp:
+            psb=PowStampBuilder(self.private_key)
             if nonce is None:
                 start_time = datetime.datetime(2000, 1, 1, 0, 0)
                 current_time = datetime.datetime.now()
                 elapsed_time = (current_time - start_time).total_seconds()
                 # UINT32として格納できる範囲に収める
                 nonce = int(elapsed_time) % (2**32)
-            return essb.encode(struct.pack('>I', nonce),pow_bits)
-        def ECDAS_SIGN_S64P33X(self,messgae:bytes)->str:
-            essb=EasyEcdsaSignatureBuilder(self.private_key)
-            return essb.encode(messgae).signature.hex()
+            return psb.encode(nonce,server_domain,payload,target_pow_score)
+
 
     class CommandBase:
         def __init__(self, args):
@@ -125,46 +160,43 @@ class JsonpostCl:
             else:
                 print("Error: Either -f (filename), -j (JSON string), or data via stdin must be provided.")
                 return
+
+
+            d_json=json.dumps(json_obj, ensure_ascii=False).encode('utf-8')
+
+
             powbitstarget=config.params_pow_bits if self.args.powbits==0 else self.args.powbits
             print(f"Target Pow bits:{powbitstarget}")
             print(f"Start hashing!")
+            espow:PowStamp=None
+            with PerformanceTimer() as pf:
+                # ハッシュ処理
+                espow = config.generatePoWStamp(self.args.nonce,self.args.server_name ,d_json,powbitstarget)            
+                pownonce = espow.powNonceAsInt  # ハッシュ値（または結果）
+                elapsed_time=pf.elapseInMs
+                # ハッシュレートを計算 (ハッシュ数/秒)
+                hash_rate = pownonce / elapsed_time if elapsed_time > 0 else 0
+                # 結果をプリント
+                # print(espow.powbits,espow.sha256d.hex())
+                print(f"accepted: {espow.score}/{pownonce} ({espow.score*100/powbitstarget:.2f}%) {round(hash_rate)}hash/s (yay!!!)")
 
-            start_time = time.time()
-            # ハッシュ処理
-            espow = config.ECDSA_SIGN_POW_S64K33N4P4(self.args.nonce, powbitstarget)            
-            pownonce = espow.pownonce  # ハッシュ値（または結果）
-            # 終了時間を計測
-            end_time = time.time()
-            elapsed_time = end_time - start_time  # 経過時間
-            # ハッシュレートを計算 (ハッシュ数/秒)
-            hash_rate = pownonce / elapsed_time if elapsed_time > 0 else 0
-            # 結果をプリント
-            # print(espow.powbits,espow.sha256d.hex())
-            print(f"accepted: {espow.powbits}/{pownonce} ({espow.powbits*100/powbitstarget:.2f}%) {round(hash_rate)}hash/s (yay!!!)")
-
-            
-            # アップロードデータの準備
-            data = {
-                "version": "urn::nyatla.jp:json-request::ecdas-signed-upload:1",
-                "signature": espow.signature.hex(),
-                "data": json_obj
-            }
-            d_json=json.dumps(data, ensure_ascii=False)
 
             # verbose が指定された場合、送信する JSON データを表示
             if self.args.verbose:
                 print("JSON data to upload:")
-                print(d_json)
+                print(f"X-PowStamp",espow.stamp.hex())
+                print(d_json.decode())
             
             # ヘッダーの指定（charset=utf-8を指定）
             headers = {
-                "Content-Type": "application/json; charset=utf-8"
+                "Content-Type": "application/json; charset=utf-8",
+                "PowStamp-1":espow.stamp.hex()
             }
 
             # アップロード先のエンドポイントに対してPOSTリクエストを送信
             ep=f"{self.args.endpoint}/upload.php"
             print(f"Uploading to {ep}...")
-            response = requests.post(ep, data=d_json.encode("utf-8"), headers=headers)
+            response = requests.post(ep, data=d_json, headers=headers)
 
 
             # 結果の表示
@@ -181,10 +213,11 @@ class JsonpostCl:
             upload_parser.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
             # 排他的な引数グループを作成
             group = upload_parser.add_mutually_exclusive_group(required=False)
-            group.add_argument("-f", "--filename", type=str, help="The filename to upload")
-            group.add_argument("-j", "--json", type=str, help="JSON string to upload")
+            group.add_argument("-F", "--filename", type=str, help="The filename to upload")
+            group.add_argument("-J", "--json", type=str, help="JSON string to upload")
             upload_parser.add_argument("data", nargs='?', type=str, help="JSON string provided directly after the command")        
-            upload_parser.add_argument("--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
+            upload_parser.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
+            upload_parser.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
             upload_parser.add_argument("--nonce", type=int, required=False, default=None, help="The nonce for the upload")
             upload_parser.add_argument("--powbits", type=int, required=False, default=0, help="Number of PoW bits required for verification.")
             upload_parser.add_argument("--verbose", action="store_true", help="Display the JSON data being uploaded.")
@@ -200,23 +233,25 @@ class JsonpostCl:
             config = JsonpostCl.AppConfig.load(self.args.config)
             data = {
                 "version": "urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
-                "signature": config.ECDAS_SIGN_S64P33X("konnichiwa".encode()),
                 "params":{
-                    "pow_bits_write":self.args.params_pow_bits_write,
-                    "pow_bits_read":self.args.params_pow_bits_read
+                    "pow_bits_write":self.args.params_powbits_write,
+                    "pow_bits_read":self.args.params_powbits_read,
+                    "server_name":self.args.server_name
                 }
             }
-            d_json=json.dumps(data, ensure_ascii=False)
+            d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
+            #スタンプの生成
+            ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0)
             # ヘッダーの指定（charset=utf-8を指定）
             headers = {
-                "Content-Type": "application/json; charset=utf-8"
+                "Content-Type": "application/json; charset=utf-8",
+                "PowStamp-1":ps.stamp.hex(),
             }
 
             # アップロード先のエンドポイントに対してPOSTリクエストを送信
             ep=f"{self.args.endpoint}/heavendoor.php?konnichiwa"
             print(f"Uploading to {ep}...")
             response = requests.post(ep, data=d_json, headers=headers)
-
 
             # 結果の表示
             print(f"Response Status Code: {response.status_code}")
@@ -229,9 +264,10 @@ class JsonpostCl:
             sp=subparsers.add_parser("konnichiwa", help="Initialize server database.")
             # upload コマンドの後に指定されるデータ
             sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
-            sp.add_argument("--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
-            sp.add_argument("--params_pow_bits_write", default=0, type=int, help="Server setting parametor. Number of hasing difficulity bits")
-            sp.add_argument("--params_pow_bits_read", default=0, type=int, help="Server setting parametor. Number of hasing difficulity bits")
+            sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
+            sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
+            sp.add_argument("--params-powbits-write", default=0, type=int, help="Server setting parametor. Number of hasing difficulity bits.")
+            sp.add_argument("--params-powbits-read", default=0, type=int, help="Server setting parametor. Number of hasing difficulity bits.")
             sp.set_defaults(func=JsonpostCl.AdminKonnichiwaCommand)
 
 

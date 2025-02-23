@@ -69,11 +69,14 @@ class EcdasSignedAccountRoot
     // データ挿入
     public function insert(string $pubkey,string  $uuid,int $nonce)
     {
+        $property_tbl_name=PropertiesTable::TABLE_NAME;
+        $vn_w=PropertiesTable::VNAME_DEFAULT_POWBITS_W;
+        $vn_r=PropertiesTable::VNAME_DEFAULT_POWBITS_R;
         $sql = "
         INSERT INTO $this->name (pubkey, uuid, nonce, pow_bits_read, pow_bits_write)
         SELECT ?, ?, ?, 
-               CAST(COALESCE((SELECT value FROM properties WHERE name = 'pow_bits_read' LIMIT 1), 0) AS INTEGER),
-               CAST(COALESCE((SELECT value FROM properties WHERE name = 'pow_bits_write' LIMIT 1), 0) AS INTEGER)
+               CAST(COALESCE((SELECT value FROM $property_tbl_name WHERE name = '$vn_r' LIMIT 1), 0) AS INTEGER),
+               CAST(COALESCE((SELECT value FROM $property_tbl_name WHERE name = '$vn_w' LIMIT 1), 0) AS INTEGER)
         ";
         // $sql = "
         // INSERT INTO $this->name (pubkey, uuid, nonce) VALUES (?, ?, ?);

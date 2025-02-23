@@ -12,7 +12,7 @@ require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインス
 // use JsonPost;
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
-use Jsonpost\utils\ecdsasigner\{PowEcdsaSignatureBuilder};
+use Jsonpost\utils\ecdsasigner\{PowStamp};
 use Jsonpost\utils\{UuidWrapper};
 
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
@@ -50,49 +50,45 @@ class SuccessResponseBuilder implements IResponseBuilder {
 }
 
 // アップロードAPIの処理
-function apiMain($db,$request):IResponseBuilder
+function apiMain($db,$rawData):IResponseBuilder
 {
-    // 1. リクエストの検証
-    $version = $request['version'] ?? null;
-    $signature = $request['signature'] ?? null;
-    $jsonData = $request['data'] ?? null;
+    $powstamp1 = $_SERVER['HTTP_POWSTAMP_1'] ?? null;
 
-    if (!$version || !$signature || !$jsonData) {
-        throw new ErrorResponseBuilder("Invalid input parameters.");
-    }
-    //versionチェック
-    if($version!="urn::nyatla.jp:json-request::ecdas-signed-upload:1"){
-        throw new ErrorResponseBuilder("Invalid version");
-    }
 
-    $pes=null;
+    $t1=new PropertiesTable($db);
+    $server_name=$t1->selectByName(PropertiesTable::VNAME_SERVER_NAME);
+    
+    $ps=null;
     try{
-        #署名からリカバリキーとnonceを取得
-        $pes=PowEcdsaSignatureBuilder::decode($signature);
+        $ps=new PowStamp(hex2bin($powstamp1));
+        if(!PowStamp::verify($ps,$server_name,$rawData,0)){
+            throw new Exception('PowStamp verify failed');
+        }
     } catch (Exception $e) {
-        throw new ErrorResponseBuilder( "Invalid signature");
-    }
-
+        throw new ErrorResponseBuilder( $e->getMessage());
+    } 
 
     //ここから書込み系の
     $ar_tbl=new EcdasSignedAccountRoot($db);
 
-    $ar_rec=$ar_tbl->selectOrInsertIfNotExist(($pes->ees->pubkey));
+    $ar_rec=$ar_tbl->selectOrInsertIfNotExist($ps->getEcdsaPubkey());
 
     #初めての場合はnonce=0
-    $nonce=unpack('N', string: hex2bin(substr($pes->ees->data,0,2*4)))[1];
+    $nonce=$ps->getNonceAsInt();
     if($ar_rec['nonce']>=$nonce){
         throw new ErrorResponseBuilder("Invalid nonce. Current nonce={$ar_rec['nonce']}");
     }
-    $current_powbits=$pes->getPowBits();
-    // print("{$ar_rec['pow_bits_write']},{$pes->getPowBits()}\n");
+    $current_powbits=$ps->getPowNonceAsInt();
     if($ar_rec['pow_bits_write']>$current_powbits){
         throw new ErrorResponseBuilder("Low powbits. Over {$ar_rec['pow_bits_write']} required.");
     }
-
     #文章を登録
     $js_tbl=new JsonStorage($db);
-    $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($jsonData,JSON_UNESCAPED_UNICODE));
+    $request = json_decode($rawData, true);
+    if ($request === null) {
+        throw new ErrorResponseBuilder("Invalid JSON format.");
+    }    
+    $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($request,JSON_UNESCAPED_UNICODE));
     $uh_tbl=new JsonStorageHistory($db);
     $uh_tbl->insert($ar_rec['id'],$js_rec['id'],0,$current_powbits);
     #nonce更新
@@ -118,14 +114,9 @@ try{
     if(strlen($rawData)>Config::MAX_JSON_SIZE){
         throw new ErrorResponseBuilder("upload data too large.");
     }
-    // JSONデータのデコード
-    $request = json_decode($rawData, true);
-    // JSONが無効であればエラーメッセージを返す
-    if ($request === null) {
-        throw new ErrorResponseBuilder("Invalid JSON format.");
-    }
+
     // アップロードAPI処理を呼び出す
-    apiMain($db, $request)->sendResponse();
+    apiMain($db, $rawData)->sendResponse();
     $db->exec("COMMIT");
 }catch(ErrorResponseBuilder $exception){
     $db->exec("ROLLBACK");

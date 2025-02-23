@@ -101,14 +101,6 @@ class JsonStorage
             throw new Exception("No data. uuid:{$u}");
         }
         return $result;
-
-        
-    
-        // // 結果を返す
-        // return [
-        //     'items' => $items,
-        //     'total' => (int)$total,  // レコードの総数
-        // ];
     }
 
 

@@ -1,4 +1,5 @@
 <?php
+
 require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
 use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
@@ -10,7 +11,7 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 // use JsonPost;
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
-use Jsonpost\utils\ecdsasigner\{EasyEcdsaStreamBuilderLite};
+use Jsonpost\utils\ecdsasigner\{PowStamp};
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
 use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
 use Jsonpost\db\views\{JsonStorageView};
@@ -41,32 +42,48 @@ class SuccessResponseBuilder implements IResponseBuilder {
 
 
 
-function apiMain($db,$request): IResponseBuilder
+function apiMain($db,string $rawData): IResponseBuilder
 {
-    $version = $request['version'] ?? null;
-    $signature = $request['signature'] ?? null;
-    $params = $request['params'] ?? null;
-    if (!$version || !$signature || !$params) {
-        throw new ErrorResponseBuilder("Invalid input parameters.");
+
+    $powstamp1 = $_SERVER['HTTP_POWSTAMP_1'] ?? null;
+    $request = json_decode($rawData, true);
+    if ($request === null) {
+        throw new ErrorResponseBuilder("Invalid JSON format.");
     }
-    //versionチェック
+    foreach(['version','params']as $v){
+        if(!array_key_exists($v,$request)){
+            throw new ErrorResponseBuilder("Invalid JSON $.$v not found.");
+        }
+    } 
+    foreach(['server_name']as $v){
+        if(!array_key_exists($v,$request['params'])){
+            throw new ErrorResponseBuilder("Invalid JSON params. $.params.$v not found.");
+        }
+    } 
+    $version = $request['version'];
+    $params=$request['params'];
     if($version!="urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1"){
         throw new ErrorResponseBuilder("Invalid version");
-    }
-    $pow_bits_read=isset($params['pow_bits_read'])?intval($params['pow_bits_read']):0;
-    $pow_bits_write=isset($params['pow_bits_write'])?intval($params['pow_bits_write']):0;
-
-    //署名を受け取る。ペイロードは"hello_jsonpost"
-    $ees=null;
+    }        
+    //スタンプの読出し
+    $ps=null;
     try{
-        #署名からリカバリキーとnonceを取得
-        $ees=EasyEcdsaStreamBuilderLite::decode($signature);
-        if($ees->data!==bin2hex('konnichiwa')){
-            throw new Exception();
+        $ps=new PowStamp(hex2bin($powstamp1));
+        if($ps->getNonceAsInt()!=0){
+            throw new ErrorResponseBuilder("Invalid Nonde");
+        }
+        if(!PowStamp::verify($ps,$params['server_name'],$rawData,0)){
+            throw new Exception('PowStamp verify failed');
         }
     } catch (Exception $e) {
         throw new ErrorResponseBuilder( $e->getMessage());
     } 
+
+
+    $pow_bits_read=isset($params['pow_bits_read'])?intval($params['pow_bits_read']):0;
+    $pow_bits_write=isset($params['pow_bits_write'])?intval($params['pow_bits_write']):0;
+
+    $pubkey_hex=bin2hex($ps->getEcdsaPubkey());
 
     // テーブルがすでに存在するかを確認
     $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
@@ -89,9 +106,10 @@ function apiMain($db,$request): IResponseBuilder
     $t2->createTable();
 
     $t1->insert('version',Config::VERSION);
-    $t1->insert('god',$ees->pubkey);
-    $t1->insert('pow_bits_read',$pow_bits_read);
-    $t1->insert('pow_bits_write',$pow_bits_write);
+    $t1->insert('god',$pubkey_hex);
+    $t1->insert(PropertiesTable::VNAME_SERVER_NAME,$params['server_name']);
+    $t1->insert(PropertiesTable::VNAME_DEFAULT_POWBITS_R,$pow_bits_read);
+    $t1->insert(PropertiesTable::VNAME_DEFAULT_POWBITS_W,$pow_bits_write);
 
     $t2->insert(JsonStorage::VERSION, $t3->name);
     $t2->insert(EcdasSignedAccountRoot::VERSION,$t4->name);
@@ -100,7 +118,7 @@ function apiMain($db,$request): IResponseBuilder
     $v=new JsonStorageView($db);
     $v->createView();
 
-    return new SuccessResponseBuilder($ees->pubkey,["pow_bits_read"=>$pow_bits_read,"pow_bits_write"=>$pow_bits_write]);
+    return new SuccessResponseBuilder($pubkey_hex,["pow_bits_read"=>$pow_bits_read,"pow_bits_write"=>$pow_bits_write]);
 
 }
 
@@ -117,19 +135,12 @@ try{
             // POSTリクエストからJSONデータを取得
             $rawData = file_get_contents('php://input');
             // $rawData = file_get_contents('./upload_test.json');
-            
             if(strlen($rawData)>1024){
                 throw new ErrorResponseBuilder("upload data too large.");
             }
-            // JSONデータのデコード
-            $request = json_decode($rawData, true);
-            // JSONが無効であればエラーメッセージを返す
-            if ($request === null) {
-                throw new ErrorResponseBuilder("Invalid JSON format.");
-            }
             // データベースのセットアップ
             
-            apiMain($db,$request)->sendResponse();
+            apiMain($db,$rawData)->sendResponse();
             break;
         }
         default:{
@@ -144,7 +155,7 @@ try{
     $db->exec("ROLLBACK");
     (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
 }catch(Error $e){
-    // (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+    // (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
 }
 
