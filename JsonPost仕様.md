@@ -158,10 +158,11 @@ rootkey hexstr 管理者のpublicキー
 ```
 CREATE TABLE account_root (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    pubkey TEXT NOT NULL, --[RO] ecdasのrecoverkey[0]
+    pubkey TEXT NOT NULL, --[RO] publickey
     uuid TEXT NOT NULL,   --[RO] ユーザー識別のためのuuid
     nonce INTEGER NOT NULL,   --[RW] 署名データの下位8バイト(nonce)
-    status INTEGER DEFAULT 1  --[RW] 状態。1のみ
+    pow_bits_write INTEGER DEFAULT 0  --[RW] PowStampに必要な強度値
+    pow_bits_read INTEGER DEFAULT 0   --[RW] PowStampに必要な強度値
 );
 ```
 
@@ -170,7 +171,6 @@ pubkey,uuidは永続データです。
 
 ユーザーの識別にはuuidを使用します。が、そのuuidを識別するためには署名のリカバリキーの候補とpubkeyで識別します。
 
-pubkeyは圧縮したrecoverkey[0]です。
 
 
 ### json_storage
@@ -185,6 +185,19 @@ CREATE TABLE json_storage (
 ```
 
 このテーブルはアカウントが投入したJSONを蓄積します。同一文章は格納できません。
+
+
+### json_spec
+```
+CREATE TABLE json_storage (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    uuid BLOB NOT NULL,                -- [RO]システム内の文章識別ID
+    hash BLOB NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
+    json JSON NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
+);
+```
+このテーブルは補助的なテーブルです。JSONの種別を
+
 
 ### json_storage_history
 ```
@@ -298,10 +311,12 @@ PowStampから識別したユーザーの情報、登録した文章の情報を
 }
 ```
 
-- nonceが記録より若い
-- 署名検証の失敗
-- JSON形式のエラー
-- PoWスコアの不足
+- ペイロードがJSON形式を満たさない。
+- 署名検証の失敗。
+  - サーバー名の不一致
+  - nonceが不正。
+  - PoWスコアの不足
+  - 正しくない署名
 
 ## 処理手順
 
@@ -339,36 +354,41 @@ GET version.php
 ## /jsonlist
 
 JSONドキュメントの検索APIです。
+返されるデータは、ドキュメントのuuidと作成日時です。
+
 
 **パラメータ**
-- index|page|uuid
-- limit
+- **index**|**uuid**
+  リストの先頭を識別します。indexは先頭からの番号を返します。uuidはドキュメントを識別し、そのうち最も古い物を先頭にします。
+  省略時はindex=0です。
+- **page**
+  indexの亜種です。limitと組み合わせて、limit*pageをインデクスとして計算します。
+  省略時はpage=0です。
+- **limit**
+  返却する項目の最大数を指定します。
+  省略時はlimit=0です。
+- **path**
+  返却するJSONのうち、pathに指定される要素が存在するものだけを抽出します。
+  省略時は無視します。
+- **value**
+  pathに指定される要素が一致するものだけを抽出します。
+  省略時は無視します。
 
 
-返されるデータは、uuid,ダイジェストです。
-返却数の最大はlimitで指定します。省略した場合はlimit=100です。
+返却数の最大はlimitで指定します。省略した場合はlimit=100です。pathとvalueによる抽出は、inxex,limitで指定した範囲のレコードから再選択します。例えば1000件のレコードに対してindex=100,limit=100を指定した場合、100件目から100レコードが先に選択され、そのなかから再度条件に一致するレコードを選択します。この範囲に条件に一致するレコードがなければ戻り値は0となります。
 
-指定できるパラメータは３種類あります。
+pathはSqliteのjson-1の関数であるjson_extractの機能を利用しているため、使用できる構文に制限があります。条件式、演算式は使用できません。
+https://www.sqlite.org/json1.html#jexb
 
-- index 登録順に先頭からの番号を返します。
+valueはパスで選択されたノードの文字列表現値と完全に一致する必要があります。
 
-- page indexの亜種です。limitと組み合わせて、limit*pageをインデクスとして計算します。
-
-- uuid ドキュメントuuidをキーとして検索し、それ以降に登録された項目を返します。
 
 未実装
 
-- account アカウントのuuidまたはパブリックキーで登録されたドキュメントを返します。
 - title 先頭からN文字をタイトルとして文字列で追記します。
 
-いずれか一つのパラメータを指定できます。省略された場合はindex=0です。
 
-
-
-
-index,page,uuid_afterはlimitを指定できます。
-
-全て省略時はindex=0,limit=100です。
+totalとindexは呼出し毎に異なる場合があります。
 
 
 ```
@@ -391,14 +411,17 @@ GET /getjsonentries.php
 }
 ```
 
-totalとindexは呼出し毎に異なる場合があります。
 
 ## /jsondoc
 
-JSONドキュメントの参照APIです
+JSONドキュメントの参照APIです。
 
 - uuid
 - raw 指定するとjson部分だけが返ります。
+- path 対象の文章を成型するjsonpathです。
+
+path値はphpのjsonpath拡張モジュールで処理します。これはsqliteのjson-1よりも幅広い式を受け付けます。
+
 
 ```
 GET /jsondoc.php?uuid=00000000-0000-0000-000000000000

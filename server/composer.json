@@ -1,7 +1,8 @@
 {
     "require": {
         "ramsey/uuid": "^4.7",
-        "simplito/elliptic-php": "^1.0"
+        "simplito/elliptic-php": "^1.0",
+        "opis/json-schema": "^2.4"
     },
     "autoload": {
         "psr-4": {

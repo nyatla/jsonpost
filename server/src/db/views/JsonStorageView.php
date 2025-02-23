@@ -1,7 +1,9 @@
 <?php
 namespace Jsonpost\db\views;
 
+use Jsonpost\utils\UuidWrapper;
 use \PDO as PDO;
+use \Exception as Exception;
 class JsonStorageView
 {
     public const VERSION = 'JsonStorageView:1';
@@ -24,7 +26,8 @@ class JsonStorageView
         js.id,
         jsh.created_date, 
         js.uuid, 
-        js.hash 
+        js.hash,
+        js.json
         FROM json_storage_history jsh
         JOIN json_storage js ON jsh.id_json_storage = js.id
         WHERE jsh.id = (
@@ -72,6 +75,75 @@ class JsonStorageView
             'total' => (int)$total,  // レコードの総数
         ];
     }
+    /**
+     * 指定されたインデックス番号から、指定された件数のデータを取得し、さらに JSON カラムの絞り込みを行う関数です。
+     *
+     * @param int $index    取得を始めるインデックス番号。例えば、最初の100件を取得する場合は 0 になります。
+     * @param int $limit    取得するレコード数。例えば、100件の場合は 100 を指定します。
+     * @param string|null $path  絞り込み対象の JSON パス。例えば '$.status' などの形式で指定します。
+     * @param string|null $value     JSON パスで取得した値が一致するレコードを絞り込みます。NULLの場合はそのキーが存在するレコードを取得します。
+     *
+     * @return array 絞り込んだレコードと、総レコード数を含む連想配列を返します。
+     *              - 'items': 絞り込まれたレコードの配列
+     *              - 'total': 総レコード数（絞り込み前）
+     */
+    public function selectByIndexWithFilter(int $index, int $limit, ?string $path, ?string $value): array
+    {
+        // 絞り込み条件の追加（$selector と $value が指定されている場合）
+        $filterCondition = '';
+        $params = [
+            ':limit' => $limit,
+            ':index' => $index
+        ];
+    
+        // $selector と $value が指定されている場合、json_extractで絞り込み
+        if ($path && $value !== null) {
+            $filterCondition = " AND json_extract(json, :selector) = :value ";
+            $params[':selector'] = $path;
+            $params[':value'] = $value;
+        } elseif ($path) {
+            // $selector が指定されているが、$value が指定されていない場合
+            $filterCondition = " AND json_extract(json, :selector) IS NOT NULL ";
+            $params[':selector'] = $path;
+        }elseif($value){
+            throw new Exception('Must be set path with value.');
+        }
+    
+        // 1つ目のクエリ：レコードのデータ（絞り込み条件を追加）
+        $sql = "
+        SELECT 
+            id,
+            created_date, 
+            uuid, 
+            hash
+        FROM $this->name
+        WHERE 1=1 $filterCondition
+        ORDER BY created_date
+        LIMIT :limit OFFSET :index;
+        ";
+    
+        // レコードデータの取得
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->execute();
+        $items = $stmt->fetchAll(PDO::FETCH_NUM);  // 配列形式で取得（jsonデータも含む）
+    
+        // 2つ目のクエリ：総レコード数（絞り込み条件を追加）
+        $countSql = "SELECT COUNT(id) FROM $this->name";
+        $stmtCount = $this->db->prepare($countSql);
+        $stmtCount->execute();
+        $total = $stmtCount->fetchColumn();
+    
+        // 結果を返す
+        return [
+            'items' => $items,
+            'total' => (int)$total,  // レコードの総数
+        ];
+    }
+
+
 
     /**
      * レコードの値がuuidと一致するレコードのindexを計算し、そのindexよりも大きいレコードをcreated_dateでソートしたものから、limit個を単純配列の配列にして返す。
@@ -79,7 +151,7 @@ class JsonStorageView
      * @param int $limit
      * @return void
      */
-    public function selectByUuid(string $uuid, int $limit): array
+    public function selectByUuid(string $uuid, int $limit, ?string $selector, ?string $value): array
     {
         // 最初に、uuidが一致するレコードのindexを取得する
         $indexSql = "
@@ -98,34 +170,10 @@ class JsonStorageView
         // $stmt=$this->db->query("select created_date from json_storage where hex(uuid)='019511DDE5B9724E9D01632FB115F0B3';");
         // uuidが一致するレコードが見つかれば、インデックスを取得
         $index = $stmt->fetchColumn();
-        $items=[];
-        if ($index !== false) {
-            // uuidのindexよりも大きいレコードをcreated_dateでソートして、limit個取得する
-            $sql = "
-            SELECT id,created_date, uuid, hash
-            FROM $this->name
-            WHERE id >= :index
-            ORDER BY id
-            LIMIT :limit;
-            ";
-        
-            $stmt = $this->db->prepare($sql);
-            $stmt->bindValue(':index', $index, PDO::PARAM_INT);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
-            $items = $stmt->fetchAll(PDO::FETCH_NUM);  // 単純配列の配列
+        if ($index === false) {
+            $u=UuidWrapper::bin2text($uuid);
+            throw new Exception("Invalid uuid {$u}");
         }
-            // 2つ目のクエリ：総レコード数
-        $countSql = "SELECT COUNT(*) FROM $this->name;";       
-        // 総レコード数の取得
-        $stmtCount = $this->db->query($countSql);
-        $total = $stmtCount->fetchColumn();
-    
-    
-        // 結果を返す
-        return [
-            'items' => $items,
-            'total' => (int)$total,  // レコードの総数
-        ];
+        return $this->selectByIndexWithFilter($index,$limit,$selector,$value);
     }
 }

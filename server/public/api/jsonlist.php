@@ -9,62 +9,40 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 
 // use JsonPost;
 use Jsonpost\Config;
-use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\db\views\{JsonStorageView};
 use Jsonpost\utils\{UuidWrapper};
 
 
-/**
- * このAPIはjsonstorageの検索APIです。
- */
-
-class SuccessResponseBuilder implements IResponseBuilder {
-    private array $items;
-    private int $total;
-    private int $index;    
-    public function __construct($total,array $items) {
-        $this->total=$total;
-        $nitems=[];
-        foreach($items as $i) {
-            $nitems[]=[$i[1],UuidWrapper::bin2text($i[2]),bin2hex($i[3])];
-        }
 
 
-
-        $this->items=$nitems;
-    }
-
-    public function sendResponse() {
-        header('Content-Type: application/json');
-        http_response_code(200);
-        echo json_encode([
-            'success' => true,
-            // 'aa'=>1,
-            'result'=>[
-                "items"=> $this->items,
-                "total"=>$this->total,
-            ],
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    }
-}
-
-
-
-
-function apiIndexMain($db,$index,$limit): IResponseBuilder
+function apiIndexMain($db,$index,$limit,$filter,$value): IResponseBuilder
 {
     $v=new JsonStorageView($db);
-    $ret=$v->selectByIndex($index, $limit);
-    return new SuccessResponseBuilder( $ret['total'],$ret['items']);
+    $ret=$v->selectByIndexWithFilter($index, $limit,$filter,$value);
+    $nitems=[];
+    foreach($ret['items'] as $i) {
+        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2]),bin2hex($i[3])];
+    }
+
+    return new SuccessResultResponseBuilder(
+        ['total'=>$ret['total'],'items'=>$nitems]
+    );
 }
 
 
-function apiIndexMain2($db,$uuid,$limit): IResponseBuilder
+function apiIndexMain2($db,$uuid,$limit,$filter,$value): IResponseBuilder
 {
     //排他キーのチェック
     $v=new JsonStorageView($db);
-    $ret=$v->selectByUuid($uuid, $limit);
-    return new SuccessResponseBuilder($ret['total'],$ret['items']);
+    $ret=$v->selectByUuid($uuid, $limit,$filter,$value);
+    $nitems=[];
+    foreach($ret['items'] as $i) {
+        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2]),bin2hex($i[3])];
+    }
+    return new SuccessResultResponseBuilder(
+        ['total'=>$ret['total'],'items'=>$nitems]
+    );
 }
 
 
@@ -90,18 +68,20 @@ try{
     if ($count > 1) {
         new ErrorResponseBuilder('Please set one of '.implode(',', $keys),405);
     }
+    $path=$_GET['path'] ?? null;
+    $value=$_GET['value'] ?? null;
     $ret;
     if($count==0){
-        $ret=apiIndexMain($db,0,$limit);
+        $ret=apiIndexMain($db,0,$limit,$path,$value);
     }else if(isset($_GET['index'])){
         $index=intval($_GET['index']);
-        $ret=apiIndexMain($db,$index,$limit);
+        $ret=apiIndexMain($db,$index,$limit,$path,$value);
     }else if(isset($_GET['page'])){
         $index=intval($_GET['page'])*$limit;
-        $ret=apiIndexMain($db,$index,$limit);
+        $ret=apiIndexMain($db,$index,$limit,$path,$value);
     }else if (isset($_GET['uuid'])){
         $uuid=UuidWrapper::text2bin($_GET['uuid']);
-        $ret=apiIndexMain2($db,$uuid,$limit);
+        $ret=apiIndexMain2($db,$uuid,$limit,$path,$value);
 
     }
     $ret->sendResponse();

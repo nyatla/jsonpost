@@ -12,6 +12,7 @@ class PropertiesTable
     public const VNAME_DEFAULT_POWBITS_W='default.pow_bits_write';
     public const VNAME_DEFAULT_POWBITS_R='default.pow_bits_read';
     public const VNAME_SERVER_NAME='server_name';
+    public const VNAME_VERSION='version';
     
     private $db;
     private $name;
@@ -63,4 +64,17 @@ class PropertiesTable
         }
         return $result[0];
     }
+    public function selectAll()
+    {
+        $indexSql = "
+        SELECT name,value
+        FROM $this->name";
+        $stmt = $this->db->prepare($indexSql);
+        $stmt->execute();
+
+        // 結果を取得
+        $result = $stmt->fetchAll(PDO::FETCH_NUM);
+
+        return $result;
+    }    
 }

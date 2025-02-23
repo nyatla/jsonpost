@@ -9,48 +9,45 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 
 // use JsonPost;
 use Jsonpost\Config;
-use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
 use Jsonpost\utils\{UuidWrapper};
-
+use JsonPath\{JsonPath,JsonPathException};
 
 /**
  * このAPIはjsonstorageの検索APIです。
  */
 
-class SuccessResponseBuilder implements IResponseBuilder {
-    private string $path;
+class RawJsonResponseBuilder implements IResponseBuilder {
     private string $json;
-    private string $is_raw;
-    public function __construct($path,$json,$is_raw) {
-        $this->path=$path;
+    public function __construct($json) {
         $this->json=$json;
-        $this->is_raw=$is_raw;
     }
 
     public function sendResponse() {
         header('Content-Type: application/json');
         http_response_code(200);
-        if($this->is_raw) {
-            echo json_encode(json_decode($this->json), JSON_UNESCAPED_UNICODE);
-        }else{
-            echo json_encode([
-                'success' => true,
-                // 'aa'=>1,
-                'result'=>[
-                    'path'=> $this->path,
-                    'data'=>json_decode($this->json),
-                ],
-            ], JSON_UNESCAPED_UNICODE);    
-        }
+        echo json_encode($this->json, JSON_UNESCAPED_UNICODE);
     }
 }
 
-function apiIndexMain($db,$uuid,$is_raw): IResponseBuilder
+function apiIndexMain($db,$uuid,$path,$is_raw): IResponseBuilder
 {
     $v=new JsonStorage($db);
     $ret=$v->selectByUuid($uuid);
-    return new SuccessResponseBuilder( '$',$ret['json'],$is_raw);
+    $found=json_decode($ret['json'],true);
+    if(isset($path)){
+        $jp=new JsonPath();
+        $found=$jp->find($found,$path);    
+    }
+
+    
+
+    if(!$is_raw){
+        return new SuccessResultResponseBuilder(['path'=> '$','data'=>$found]);
+    }else{
+        return new RawJsonResponseBuilder($found);
+    }
 }
 
 
@@ -67,7 +64,9 @@ try{
     $ret=apiIndexMain(
         $db,
         UuidWrapper::text2bin($_GET['uuid']),
-        isset($_GET['raw']));
+        $_GET['path']??null,
+        isset($_GET['raw']),
+    );
     $ret->sendResponse();
 }catch(ErrorResponseBuilder $e){
     $e->sendResponse();

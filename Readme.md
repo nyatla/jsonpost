@@ -26,7 +26,8 @@ PoWの演算は最大10秒で停止するように実装されていますが、
 
 # セットアップ
 
-
+composer require opis/json-schema
+composer require opis/json-schema
 # アップロード
 
 
