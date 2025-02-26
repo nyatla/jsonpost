@@ -7,6 +7,16 @@ use \Exception as Exception;
 use \Jsonpost\utils\UuidWrapper;
 
 
+class EcdasSignedAccountRoot_selectOrInsertIfNotExistResult {
+    public readonly bool $isInserted;
+    public readonly array $record;
+
+    public function __construct(bool $isInserted, array $record) {
+        $this->isInserted = $isInserted;
+        $this->record = $record;
+    }
+}
+
 class EcdasSignedAccountRoot
 {
     public const VERSION='EcdasSignedAccountRoot:1';
@@ -27,25 +37,29 @@ class EcdasSignedAccountRoot
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pubkey BLOB NOT NULL UNIQUE,   --[RO] ecdasのrecoverkey[0]
             uuid BLOB NOT NULL UNIQUE,     --[RO] ユーザー識別のためのuuid
-            nonce INTEGER NOT NULL,        --[RW] 署名データの下位8バイト(nonce)
-            pow_bits_read INTEGER,         --[RW] 現在のpowbits
-            pow_bits_write INTEGER         --[RW] 現在のpowbits
+            nonce INTEGER NOT NULL         --[RW] 署名データの下位8バイト(nonce)
         );
         ";
         $this->db->exec($sql);
     }
-    // pubkeysの何れかに一致するpubkeyを持つレコードを返す
-    public function selectOrInsertIfNotExist(string $pubkey)
+    
+
+
+    /**
+     * pubkeysの何れかに一致するpubkeyを持つレコードを返す
+     * @return array(bool,mixed) 新規フラグ,レコード
+     */
+    public function selectOrInsertIfNotExist(string $pubkey,int $mode=PDO::FETCH_ASSOC):EcdasSignedAccountRoot_selectOrInsertIfNotExistResult
     {
         // pubkey に一致するレコードを検索
         $sql = "SELECT * FROM $this->name WHERE pubkey = ? LIMIT 1;";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$pubkey]);
-        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+        $record = $stmt->fetch($mode);
     
         if ($record) {
             // レコードが存在する場合、そのレコードを返す
-            return $record;
+            return new EcdasSignedAccountRoot_selectOrInsertIfNotExistResult(false,$record);
         } else {
             // レコードが存在しない場合、新しいレコードを挿入            
             $uuid = UuidWrapper::create7();
@@ -63,21 +77,15 @@ class EcdasSignedAccountRoot
             $stmt->execute([$insertedId]);
             
             // 新しく挿入したレコードを返す
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            return new EcdasSignedAccountRoot_selectOrInsertIfNotExistResult(true,$stmt->fetch($mode));
         }
     }
     // データ挿入
     public function insert(string $pubkey,string  $uuid,int $nonce)
     {
-        $property_tbl_name=PropertiesTable::TABLE_NAME;
-        $vn_w=PropertiesTable::VNAME_DEFAULT_POWBITS_W;
-        $vn_r=PropertiesTable::VNAME_DEFAULT_POWBITS_R;
         $sql = "
-        INSERT INTO $this->name (pubkey, uuid, nonce, pow_bits_read, pow_bits_write)
-        SELECT ?, ?, ?, 
-               CAST(COALESCE((SELECT value FROM $property_tbl_name WHERE name = '$vn_r' LIMIT 1), 0) AS INTEGER),
-               CAST(COALESCE((SELECT value FROM $property_tbl_name WHERE name = '$vn_w' LIMIT 1), 0) AS INTEGER)
-        ";
+        INSERT INTO $this->name (pubkey, uuid, nonce)
+        SELECT ?, ?, ?,0,0";
         // $sql = "
         // INSERT INTO $this->name (pubkey, uuid, nonce) VALUES (?, ?, ?);
         // ";

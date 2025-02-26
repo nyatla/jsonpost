@@ -234,8 +234,7 @@ class JsonpostCl:
             data = {
                 "version": "urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
                 "params":{
-                    "pow_bits_write":self.args.params_powbits_write,
-                    "pow_bits_read":self.args.params_powbits_read,
+                    "pow_algorithm":self.args.pow_algorithm,
                     "server_name":self.args.server_name
                 }
             }
@@ -266,8 +265,7 @@ class JsonpostCl:
             sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
             sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
             sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
-            sp.add_argument("--params-powbits-write", default=0, type=int, help="Server setting parametor. Number of hasing difficulity bits.")
-            sp.add_argument("--params-powbits-read", default=0, type=int, help="Server setting parametor. Number of hasing difficulity bits.")
+            sp.add_argument("--pow-algorithm", type=str, required=False, default='tlsln(10,16,.8)', help="Pow difficulty detection algorithm.")
             sp.set_defaults(func=JsonpostCl.AdminKonnichiwaCommand)
 
 

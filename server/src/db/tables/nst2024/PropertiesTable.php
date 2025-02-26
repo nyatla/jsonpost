@@ -9,10 +9,11 @@ use \Exception as Exception;
 class PropertiesTable
 {
     public const TABLE_NAME='properties';
-    public const VNAME_DEFAULT_POWBITS_W='default.pow_bits_write';
-    public const VNAME_DEFAULT_POWBITS_R='default.pow_bits_read';
+    public const VNAME_POW_ALGORITHM='pow_algorithm';
     public const VNAME_SERVER_NAME='server_name';
+    public const VNAME_ROOT_POW_ACCEPT_TIME='root.pow_accept_time';
     public const VNAME_VERSION='version';
+    public const VNAME_GOD='god';
     
     private $db;
     private $name;
@@ -64,7 +65,7 @@ class PropertiesTable
         }
         return $result[0];
     }
-    public function selectAll()
+    public function selectAll(int $mode)
     {
         $indexSql = "
         SELECT name,value
@@ -73,8 +74,35 @@ class PropertiesTable
         $stmt->execute();
 
         // 結果を取得
-        $result = $stmt->fetchAll(PDO::FETCH_NUM);
+        $result = $stmt->fetchAll($mode);
 
         return $result;
-    }    
+    }
+    public function selectAllAsAssoc():array{
+        $r=[];
+        foreach($this->selectAll(PDO::FETCH_NUM) as $v){
+            $r[$v[0]] = $v[1];
+        }
+        return $r;
+    }
+    public function updatePowParams(float $pow_diff_th, int $pow_time)
+    {
+        $sql = "
+        UPDATE {$this->name}
+        SET value = CASE
+            WHEN name = 'time.root.pow_diff_th' THEN :pow_diff_th
+            WHEN name = 'root.pow_accept_time' THEN :pow_time
+        END
+        WHERE name IN ('time.root.pow_diff_th', 'root.pow_accept_time')";
+    
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':pow_diff_th', (string) $pow_diff_th, PDO::PARAM_STR);
+        $stmt->bindValue(':pow_time', (string) $pow_time, PDO::PARAM_INT);
+        $stmt->execute();
+    
+        // `UPDATE` の影響を受けた行数を確認
+        if ($stmt->rowCount() === 0) {
+            throw new Exception("Update failed: No matching rows found.");
+        }
+    }
 }

@@ -1,5 +1,7 @@
 <?php
 
+use Jsonpost\utils\pow\TimeSizeDifficultyBuilder;
+
 require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
 use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
@@ -10,7 +12,7 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 
 // use JsonPost;
 use Jsonpost\Config;
-use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder};
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\utils\ecdsasigner\{PowStamp};
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
 use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
@@ -19,25 +21,7 @@ use Jsonpost\db\views\{JsonStorageView};
 
 
 
-class SuccessResponseBuilder implements IResponseBuilder {
-    private string $godkey;
-    private array $params;
-    public function __construct($godkey,$params) {
-        $this->godkey = $godkey;
-        $this->params=$params;
-    }
 
-    public function sendResponse() {
-        header('Content-Type: application/json');
-        http_response_code(200);
-        
-        echo json_encode([
-            'success' => true,
-            'result'=>['godkey'=> $this->godkey],
-            'params'=>$this->params,
-        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    }
-}
 
 
 
@@ -77,12 +61,13 @@ function apiMain($db,string $rawData): IResponseBuilder
         }
     } catch (Exception $e) {
         throw new ErrorResponseBuilder( $e->getMessage());
-    } 
+    }
+    if(!isset($params[PropertiesTable::VNAME_POW_ALGORITHM])){
+        throw new Exception('Pow algorithm not set.');
+    }
+    $pow_algorithm=TimeSizeDifficultyBuilder::fromText($params[PropertiesTable::VNAME_POW_ALGORITHM]);
 
-
-    $pow_bits_read=isset($params['pow_bits_read'])?intval($params['pow_bits_read']):0;
-    $pow_bits_write=isset($params['pow_bits_write'])?intval($params['pow_bits_write']):0;
-
+    
     $pubkey_hex=bin2hex($ps->getEcdsaPubkey());
 
     // テーブルがすでに存在するかを確認
@@ -106,10 +91,11 @@ function apiMain($db,string $rawData): IResponseBuilder
     $t2->createTable();
 
     $t1->insert('version',Config::VERSION);
-    $t1->insert('god',$pubkey_hex);
-    $t1->insert(PropertiesTable::VNAME_SERVER_NAME,$params['server_name']);
-    $t1->insert(PropertiesTable::VNAME_DEFAULT_POWBITS_R,$pow_bits_read);
-    $t1->insert(PropertiesTable::VNAME_DEFAULT_POWBITS_W,$pow_bits_write);
+    $t1->insert(PropertiesTable::VNAME_GOD,$pubkey_hex);    //管理者キー
+    $t1->insert(PropertiesTable::VNAME_SERVER_NAME,$params['server_name']); //サーバー識別名
+    $t1->insert(PropertiesTable::VNAME_POW_ALGORITHM,$pow_algorithm->serialize());    //Diffアルゴリズム識別子
+    $t1->insert(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME,0);     //ルートのPOWリクエスト受理時刻
+    
 
     $t2->insert(JsonStorage::VERSION, $t3->name);
     $t2->insert(EcdasSignedAccountRoot::VERSION,$t4->name);
@@ -118,8 +104,12 @@ function apiMain($db,string $rawData): IResponseBuilder
     $v=new JsonStorageView($db);
     $v->createView();
 
-    return new SuccessResponseBuilder($pubkey_hex,["pow_bits_read"=>$pow_bits_read,"pow_bits_write"=>$pow_bits_write]);
-
+    return new SuccessResultResponseBuilder(
+        [
+            PropertiesTable::VNAME_GOD=>$pubkey_hex,
+            PropertiesTable::VNAME_SERVER_NAME=>$params['server_name'],
+            PropertiesTable::VNAME_POW_ALGORITHM=>$pow_algorithm->serialize(),
+        ]);
 }
 
 

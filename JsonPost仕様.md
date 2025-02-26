@@ -81,7 +81,7 @@ PowStamp-1: 0102.....
 
 # 署名形式
 
-### POW_STAMP
+## POW_STAMP
 POW_STAMPは、クライアントがサーバーの操作系APIを呼び出すときにHttpヘッダに付加するバイトデータです。
 1回限りの使い捨ての情報です。 APIが受理されるたび作り直す必要があります。
 
@@ -117,10 +117,63 @@ PayloadHashは、ペイロードを持たない場合は0を指定します。
 この２つのパラメータは、サーバー側の固有パラメータをリクエストの一部であるため、POW_STAMPには含まれません
 
 ### POW_STAMPのスコア
+sha256d(POW_STAMP)で得たハッシュ値の先頭から32ビットのbigendian-UINTがスコア値です。
+この値はとして使われ、APIの実行時に内部の閾値と比較します。
 
-sha256d(POW_STAMP)で得たハッシュ値の先頭から、連続する0ビットの数がスコアになります。
-サーバーはPOW_STAMPのスコアを内部の記録と比較し、閾値を下回ったものについては処理を拒否します。
+閾値は機能毎に異なり、APIが要求する閾値は/diff.phpで取得できます。
 
+
+# POW閾値（難易度）
+
+POW閾値はサーバによって計算されるハッシングの難易度です。サーバはPOW_STAMPのスコア値と比較し、POW_STAMPスコアが閾値を下回るリクエストだけを受理します。
+
+
+定義済の閾値は以下の通りです。
+
+## TimeLogiticsSizeLogNormal(e,s,s_sigma) 
+
+postペイロードのサイズと、前回のアップロードからの経過時間から計算します。
+初回のアップロードは最後の初回登録からの経過時間を代わりに用います。
+
+アップロードのドメインはrootとuserの2つがあり、rootはuserが不明な場合に使います。
+
+計算した値Rは、[0,1]の範囲にある確率値であり、これを以下の式で閾値に変換します。
+````
+難易度=(32*R)
+閾値=2^難易度
+````
+
+### 算出アルゴリズム
+
+postペイロードのサイズPAYLOAD_SIZEは、以下の変換式でレートPSに変換します。
+PSはピーク値で除算して[0,1]に正規化します。
+
+PS=対数標準偏差(PAYLOAD_SIZE,SIGMA,MU)
+
+パラメータ
+- SIGMA 対数標準偏差のσ値。
+- MU 収集するファイルサイズ分布の中心
+
+ファイルサイズがMUに近いほどPSの値が1に近づきます。
+
+
+経過時間ELAPSE_TIMEは以下の変換式でレートTに変換します。
+
+T=ロジスティック関数(ELAPSE_TIME,HALF_T_POINT)
+
+パラメータ
+- HALF_T_POINT ロジティクス関数の最大値の0.5倍に到達する経過時間です。目標経過時間の0.5倍を指定します。
+
+経過時間がHALF_T_POINTの2倍を超えると、Tの値は1に収束します。
+
+
+PSとTの積を計算し、[0,1]の値を得ます。この値は、経過時刻とファイルサイズが目標値に近い確率値になります。
+
+
+補正アルゴリズム（オプション）
+
+ハッシング性能の高いシステムが接続してきた場合、レートTが正しく機能しない場合があります。
+その場合、一時的にHALF_T_POINTをどうにかするひつようがあるからグラフ確認しながらやる。
 
 
 
@@ -134,10 +187,24 @@ sha256d(POW_STAMP)で得たハッシュ値の先頭から、連続する0ビッ�
 システムテーブルとして、Nyatla.jpDB管理テーブル標準規格2024のテーブルがあります。
 
 ### properties
+
 以下の値を格納します。
-rootkey hexstr 管理者のpublicキー
+- god hexxst 管理者publicキー
+- powalgorithm powアルゴリズムの種類.指定可能値は後述
 
 
+#### powalgorithm
+指定可能な値は以下の通りです。
+
+**tlsln**
+TimeLogiticsSizeLogNormal(et,s,s_sigma)
+
+書式 tlsln(10,16,.8)
+- et 目標アップロード間隔(s)
+- s 目標ファイルサイズ。(kb)
+- s_sigma ファイルサイズの分散σ値
+
+TimeLogiticsSizeNormalsOr(eh,s,s_sigma)
 
 ##　アプリケーションテーブル
 
@@ -160,9 +227,9 @@ CREATE TABLE account_root (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     pubkey TEXT NOT NULL, --[RO] publickey
     uuid TEXT NOT NULL,   --[RO] ユーザー識別のためのuuid
-    nonce INTEGER NOT NULL,   --[RW] 署名データの下位8バイト(nonce)
-    pow_bits_write INTEGER DEFAULT 0  --[RW] PowStampに必要な強度値
-    pow_bits_read INTEGER DEFAULT 0   --[RW] PowStampに必要な強度値
+    nonce INTEGER NOT NULL,   --[RW] インクリメンタルnonce
+//    pow_bits_write INTEGER DEFAULT 0  --[RW] PowStampに必要な強度値 廃止予定
+//    pow_bits_read INTEGER DEFAULT 0   --[RW] PowStampに必要な強度値 廃止予定
 );
 ```
 
@@ -242,16 +309,17 @@ POST　/heavendoor?konnichiwa
 {
     "version":"urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
     "params":{
-        "pow_bits_write":1,
-        "pow_bits_read":1,
-        "server_name":null        
+        "server_name":null,
+        "pow_algorithm":"tnsln(5,64000,.8)"
     }
 }
+
 ```
 server_nameに指定した名前はサーバーのドメイン名に設定され、以降のPowStamp-1でを生成するときに必要になります。
 この値が同一なサーバーでは、他の同一名のサーバーに使用されたPowStamp-1が最大１度だけ使用可能です。
 
-
+pow_algorithmは```アルゴリズム名(パラメータ)```で指定します。
+現在指定できるのはtnslnのみです。この例では、アップロード間隔のターゲット5秒、JSONファイルサイズのターゲット64kbを中心にしています。
 
 
 **成功**
@@ -464,3 +532,27 @@ GET /json.php?uuid=00000000-0000-0000-000000000000
 }
 ```
 
+# 攻撃手法と防衛策
+
+## 既存ユーザーの高頻度アクセス
+- 同一なトランザクションを繰り返し送る
+  ✅署名に加算nonceを組み込んでによって識別する。
+
+- 異なるトランザクションを高頻度で送る
+  動的難易度変更で時間当たりの難易度を平坦化する。
+
+- 事前計算による一括送信
+  動的難易度変更により事前計算を無効にする。
+  ハッシュチェーンで署名に予測不能nonceを要求する。
+
+
+
+## 未知ユーザーの高頻度アクセス
+- 短時間に大量の新規アカウントを作成する
+  事後評価により登録テーブルからの抹消。
+  単位時間当たりの新規登録を制限する。
+
+
+## 別サーバー間での問題
+- トランザクション混入
+  ✅サーバー識別子を署名に組み込む

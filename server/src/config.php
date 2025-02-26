@@ -13,6 +13,7 @@ class Config{
     public const DB_PATH="../../db/test.sqlite3";
     //JSONの最大サイズ
     public const MAX_JSON_SIZE=256*1024;
+    public const NEW_ACCOUNT_PER_SEC= 1;
     //
     public const ENABLE=true;   
     static function getRootDb(): PDO{

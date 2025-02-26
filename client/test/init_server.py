@@ -28,4 +28,4 @@ from jsonpostcl import JsonpostCl
     # #         command_class.execute()
     # #     else:
     # #         parser.print_help()
-JsonpostCl.main("konnichiwa http://127.0.0.1:8000/api --params-powbits-write 4 --params-powbits-read 0".split(" "))
+JsonpostCl.main("konnichiwa http://127.0.0.1:8000/api".split(" "))
