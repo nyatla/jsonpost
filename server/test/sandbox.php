@@ -1,29 +1,53 @@
 <?php
 function parseTlsln(string $input): ?array {
-    if (preg_match('/^\s*(\w+)\s*\(\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*,\s*(-?\d*\.?\d+)\s*\)\s*$/', $input, $matches)) {
-        return [
-            'name' => $matches[1],  // 関数名を取得
-            'et' => (float)$matches[2],
-            's' => (int)$matches[3],
-            's_sigma' => (float)$matches[4]
-        ];
+    if (preg_match('/^\s*(\w+)\(\s*(\d+(\.\d+)?)\s*,\s*(\d+)\s*,\s*(\d+(\.\d+)?)\s*\)\s*$/', $input, $matches)) {
+        return [$matches[1], $matches[2], $matches[3], $matches[4]];
     }
-    return null;
+    throw new Exception("Invalid format {$input}");
 }
 
-// テストコード
-$testCases = [
-    'tlsln(1.5,32,.5)',       // 標準ケース
-    'tlsln( 10 , 100 , 2.0 )', // 空白が入ったケース
-    ' tlsln(0.8,50,0.3)',     // 前後に空白
-    'invalid(1.5,32,.5)',     // 関数名が違うケース
-    'testFunc(-3.2, 42, 1.1)', // 負の値を含む
-    'abc(2.7, 99, -0.8)',     // 別の関数名、負の s_sigma
-    'tlsln(abc, 32, .5)',     // 無効な数値
-];
 
-foreach ($testCases as $test) {
-    $result = parseTlsln($test);
-    echo "Input: $test\n";
-    echo "Output: " . json_encode($result, JSON_PRETTY_PRINT) . "\n\n";
+function test_fromText() {
+    $testCases = [
+        // ✅ 正しい形式（整数 & 小数）
+        "func(1.5,32,0.5)"    => true,
+        "func(10,100,2.0)"    => true,
+        "func(0.8,50,0.3)"    => true,
+        "func(.5,20,.1)"      => true,  // 小数点のみの表記もOK
+        "func(42,99,3.14)"    => true,  // 整数 + 小数の組み合わせ
+
+        // ❌ 負の数（エラーが発生する）
+        "func(-1.5,32,0.5)"   => false,
+        "func(1.5,-32,0.5)"   => false,
+        "func(1.5,32,-0.5)"   => false,
+
+        // ❌ 無効な入力
+        "func(abc,32,0.5)"    => false,  // 1つ目が数値でない
+        "func(1.5,32,)"       => false,  // 3つ目が空
+        "func(1.5, 32)"       => false,  // 引数が足りない
+        "func(1.5,32.1,0.5,7)"  => false,  // 引数が多すぎる
+        "func(1.5, 32, 0.5 "  => false,  // 閉じ括弧なし
+        "func 1.5,32,0.5)"    => false,  // 括弧なし
+        "func()"              => false,  // 引数なし
+    ];
+
+    foreach ($testCases as $input => $expected) {
+        try {
+            $result = parseTlsln($input);
+            if ($expected) {
+                echo "✅ OK: $input\n";
+            } else {
+                echo "❌ NG: $input (Expected failure but succeeded)\n";
+            }
+        } catch (Exception $e) {
+            if (!$expected) {
+                echo "✅ Expected Error: $input\n";
+            } else {
+                echo "❌ Unexpected Error: $input\n";
+            }
+        }
+    }
 }
+
+// テスト実行
+test_fromText();

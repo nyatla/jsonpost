@@ -7,13 +7,17 @@ use \Exception as Exception;
 use \Jsonpost\utils\UuidWrapper;
 
 
-class EcdasSignedAccountRoot_selectOrInsertIfNotExistResult {
-    public readonly bool $isInserted;
-    public readonly array $record;
 
-    public function __construct(bool $isInserted, array $record) {
-        $this->isInserted = $isInserted;
-        $this->record = $record;
+class EcdasSignedAccountRootRecord {
+
+    public ?int $id = null;    
+    public string $pubkey;
+    public string $uuid;
+    public int $nonce;
+
+    public readonly int $is_new_record;
+    public function __construct($is_new_record){
+        $this->is_new_record = $is_new_record;
     }
 }
 
@@ -49,17 +53,16 @@ class EcdasSignedAccountRoot
      * pubkeysの何れかに一致するpubkeyを持つレコードを返す
      * @return array(bool,mixed) 新規フラグ,レコード
      */
-    public function selectOrInsertIfNotExist(string $pubkey,int $mode=PDO::FETCH_ASSOC):EcdasSignedAccountRoot_selectOrInsertIfNotExistResult
+    public function selectOrInsertIfNotExist(string $pubkey):EcdasSignedAccountRootRecord
     {
         // pubkey に一致するレコードを検索
         $sql = "SELECT * FROM $this->name WHERE pubkey = ? LIMIT 1;";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$pubkey]);
-        $record = $stmt->fetch($mode);
-    
+        $record = $stmt->fetchObject('Jsonpost\db\tables\EcdasSignedAccountRootRecord',[false]);
         if ($record) {
             // レコードが存在する場合、そのレコードを返す
-            return new EcdasSignedAccountRoot_selectOrInsertIfNotExistResult(false,$record);
+            return $record;
         } else {
             // レコードが存在しない場合、新しいレコードを挿入            
             $uuid = UuidWrapper::create7();
@@ -77,7 +80,7 @@ class EcdasSignedAccountRoot
             $stmt->execute([$insertedId]);
             
             // 新しく挿入したレコードを返す
-            return new EcdasSignedAccountRoot_selectOrInsertIfNotExistResult(true,$stmt->fetch($mode));
+            return $stmt->fetchObject('Jsonpost\db\tables\EcdasSignedAccountRootRecord',[true]);
         }
     }
     // データ挿入
@@ -85,7 +88,7 @@ class EcdasSignedAccountRoot
     {
         $sql = "
         INSERT INTO $this->name (pubkey, uuid, nonce)
-        SELECT ?, ?, ?,0,0";
+        SELECT ?, ?, ?";
         // $sql = "
         // INSERT INTO $this->name (pubkey, uuid, nonce) VALUES (?, ?, ?);
         // ";
@@ -100,7 +103,7 @@ class EcdasSignedAccountRoot
         $stmt->execute([$newNonce, $id]);
     }
 
-    public function getNonceById($id)
+    public function getNonceById($id): mixed
     {
         // id で検索して nonce を取得
         $sql = "SELECT nonce FROM $this->name WHERE id = ? LIMIT 1;";
@@ -118,13 +121,13 @@ class EcdasSignedAccountRoot
     }
 
     // uuidによるアカウントの検索
-    public function getAccountByUuid($uuid)
+    public function getAccountByUuid($uuid):EcdasSignedAccountRootRecord
     {
         $sql = "
         SELECT * FROM $this->name WHERE uuid = ?;
         ";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$uuid]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        return $stmt->fetchObject('EcdasSignedAccountRootRecord',[false]);
     }
 }

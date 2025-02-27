@@ -183,8 +183,10 @@ class JsonpostCl:
 
             # verbose が指定された場合、送信する JSON データを表示
             if self.args.verbose:
-                print("JSON data to upload:")
+                print("Upload data :")
                 print(f"X-PowStamp",espow.stamp.hex())
+                print(f"HASH",espow.hash.hex())
+                print("JSON:")
                 print(d_json.decode())
             
             # ヘッダーの指定（charset=utf-8を指定）

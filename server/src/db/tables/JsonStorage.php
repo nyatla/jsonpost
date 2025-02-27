@@ -5,6 +5,19 @@ use \PDO as PDO;
 use \Exception as Exception;
 use \Jsonpost\utils\UuidWrapper;
 
+
+
+class JsonStorageRecord {
+
+    public ?int $id = null;    
+    public string $uuid;
+    public string $hash;
+    public string $json;
+    public readonly int $is_new_record;
+    public function __construct($is_new_record){
+        $this->is_new_record = $is_new_record;
+    }
+}
 class JsonStorage
 {
     public const VERSION='JsonStorage:1';
@@ -33,7 +46,7 @@ class JsonStorage
     }
 
     // jsonDataのSHA-256ハッシュを取り、そのハッシュを使ってUUID5を生成（URL名前空間使用）
-    public function selectOrInsertIfNotExist(string $jsonData)
+    public function selectOrInsertIfNotExist(string $jsonData):JsonStorageRecord
     {
         // jsonDataのSHA-256ハッシュを計算
         $hash = hex2bin(hash('sha256', $jsonData)); // JSONデータのSHA-256ハッシュ
@@ -46,7 +59,7 @@ class JsonStorage
         $stmt = $this->db->prepare($sql);
         $stmt->bindParam(':hash', $hash);
         $stmt->execute();
-        $record = $stmt->fetch();
+        $record = $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[false]);
 
         if ($record) {
             // レコードが存在すれば返す
@@ -73,10 +86,10 @@ class JsonStorage
             $stmt->execute([$insertedId]);
             
             // 新しく挿入したレコードを返す
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            return $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[true]);
         }
     }
-    public function selectByUuid(string $uuid): array
+    public function selectByUuid(string $uuid): JsonStorageRecord
     {
         // 最初に、uuidが一致するレコードのindexを取得する
         $indexSql = "
@@ -93,7 +106,7 @@ class JsonStorage
         $stmt->execute();
 
         // 結果を取得
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[false]);
 
         // レコードが存在しない場合は例外をスロー
         if (!$result) {

@@ -85,22 +85,22 @@ class PropertiesTable
         }
         return $r;
     }
-    public function updatePowParams(float $pow_diff_th, int $pow_time)
+    public function updateParam(string $name, string $value)
     {
-        $sql = "
-        UPDATE {$this->name}
-        SET value = CASE
-            WHEN name = 'time.root.pow_diff_th' THEN :pow_diff_th
-            WHEN name = 'root.pow_accept_time' THEN :pow_time
-        END
-        WHERE name IN ('time.root.pow_diff_th', 'root.pow_accept_time')";
-    
+        // SQLクエリを準備
+        $sql = "UPDATE {$this->name} SET value = :value WHERE name = :name";
+        
+        // プリペアドステートメントの準備
         $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':pow_diff_th', (string) $pow_diff_th, PDO::PARAM_STR);
-        $stmt->bindValue(':pow_time', (string) $pow_time, PDO::PARAM_INT);
+        
+        // バインドする値をセット
+        $stmt->bindValue(':name', $name, PDO::PARAM_STR);
+        $stmt->bindValue(':value', $value, PDO::PARAM_STR);
+        
+        // クエリを実行
         $stmt->execute();
-    
-        // `UPDATE` の影響を受けた行数を確認
+        
+        // 更新がなかった場合の処理
         if ($stmt->rowCount() === 0) {
             throw new Exception("Update failed: No matching rows found.");
         }

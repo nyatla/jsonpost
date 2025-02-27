@@ -35,7 +35,7 @@ function apiIndexMain($db,$uuid,$path,$is_raw): IResponseBuilder
 {
     $v=new JsonStorage($db);
     $ret=$v->selectByUuid($uuid);
-    $found=json_decode($ret['json'],true);
+    $found=json_decode($ret->json,true);
     if(isset($path)){
         $jp=new JsonPath();
         $found=$jp->find($found,$path);    

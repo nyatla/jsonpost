@@ -228,8 +228,6 @@ CREATE TABLE account_root (
     pubkey TEXT NOT NULL, --[RO] publickey
     uuid TEXT NOT NULL,   --[RO] ユーザー識別のためのuuid
     nonce INTEGER NOT NULL,   --[RW] インクリメンタルnonce
-//    pow_bits_write INTEGER DEFAULT 0  --[RW] PowStampに必要な強度値 廃止予定
-//    pow_bits_read INTEGER DEFAULT 0   --[RW] PowStampに必要な強度値 廃止予定
 );
 ```
 
@@ -254,7 +252,7 @@ CREATE TABLE json_storage (
 このテーブルはアカウントが投入したJSONを蓄積します。同一文章は格納できません。
 
 
-### json_spec
+<!-- ### json_spec
 ```
 CREATE TABLE json_storage (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
@@ -263,7 +261,7 @@ CREATE TABLE json_storage (
     json JSON NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
 );
 ```
-このテーブルは補助的なテーブルです。JSONの種別を
+このテーブルは補助的なテーブルです。JSONの種別を -->
 
 
 ### json_storage_history
@@ -274,7 +272,7 @@ CREATE TABLE json_storage_history (
     id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
     id_json_storage INTEGER NOT NULL,   -- [RO]文章のID
     opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
-    powbits INTEGER NOT NULL --[RO]登録時のPOWビット数
+    pownonce INTEGER NOT NULL --[RO]登録時のPOW-NONCE数
 );
 ```
 このテーブルはアカウントが投入したJSONとアカウントのIDペア、その投入を記録します。

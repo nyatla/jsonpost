@@ -53,10 +53,10 @@
             'timeslot'=>null,
             'difficulty'=>$app->update(null)[1],
          ],
-         'private'=>[
-            'uuid':,
-            'difficulty'=>$app->update(null)[1],
-         ]
+        //  'private'=>[
+        //     'uuid':,
+        //     'difficulty'=>$app->update(null)[1],
+        //  ]
 
      ];
      $db->exec("COMMIT");    

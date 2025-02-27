@@ -16,9 +16,16 @@ class TimeLogiticsSizeLnDifficulty implements ITimeSizeDifficultyProvider{
         $this->_params=[$time_half_target,$size_peak_point,$size_share];
     }
 
+    /**
+     * [1:0]の確率値。1に近いほうが成功。
+     * @param float $time
+     * @param float $size
+     * @return float
+     */
     public function rate(float $time, float $size): float {
         return $this->g->rate($size) * $this->l->rate($time);
     }
+
     public function serialize(): string {
         return TimeLogiticsSizeLnDifficulty::NAME.'('.implode(',',($this->_params)).')';
     }
@@ -36,10 +43,10 @@ class TimeSizeDifficultyBuilder{
      * name:(n,n,n)形式の値をパースする
      */
     public static function fromText(string $input): ITimeSizeDifficultyProvider {        
-        if (preg_match('/^\s*(\w+)\s*\(\s*(-?\d*\.?\d+)\s*,\s*(\d+)\s*,\s*(-?\d*\.?\d+)\s*\)\s*$/', $input, $matches)) {
-            return TimeSizeDifficultyBuilder::build($matches[1], $matches[2], $matches[3], $matches[4]);
+        if (preg_match('/^\s*(\w+)\(\s*(\d+(\.\d+)?)\s*,\s*(\d+(\.\d+)?)\s*,\s*(\d+(\.\d+)?)\s*\)\s*$/', $input, $matches)) {
+            return TimeSizeDifficultyBuilder::build($matches[1], $matches[2], $matches[4], $matches[6]);
         }
         throw new Exception("Invalid format {$input}");
-    }    
-}
+    }
 
+}

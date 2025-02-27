@@ -6,11 +6,15 @@ namespace Jsonpost\responsebuilder;
 use \Exception as Exception;
 
 class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
-    private int $status;
+    private readonly int $status;
+    private readonly int $err_code;
+    private readonly array $hint;
     
-    public function __construct(string $message, int $status = 400) {
+    public function __construct(string $message, int $status = 400,int $err_code=0,array $hint=null) {
         parent::__construct($message);
         $this->status = $status;
+        $this->err_code = $err_code;
+        $this->hint = $hint;
     }
 
     public function sendResponse() {
@@ -19,7 +23,11 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
         
         echo json_encode([
             'success' => false,
-            'message' => $this->message
+            'error'=>[
+                'code'=> $this->err_code,
+                'message' => $this->message,
+                'hint'=>$this->hint
+            ]
         ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
 }

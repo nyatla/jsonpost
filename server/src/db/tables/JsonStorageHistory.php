@@ -2,10 +2,23 @@
 namespace Jsonpost\db\tables;
 
 
+use \PDO as PDO;
+
+
+class JsonStorageHistoryRow{
+    public ?int $id;
+    public int $created_date;
+    public int $id_account;
+    public int $id_json_storage;
+    public int $opcode;
+    public int $pownonce;
+    // カラム名とプロパティ名が一致している必要があります
+    // 名前が異なる場合は、SQL側でエイリアスを使用するか、__set()マジックメソッドで対応します
+}
 
 class JsonStorageHistory
 {
-    public const VERSION='JsonStorageHistory:1';    
+    public const VERSION='JsonStorageHistory:1';
     private $db;
     public readonly string $name;
 
@@ -24,22 +37,50 @@ class JsonStorageHistory
             id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
             id_json_storage INTEGER NOT NULL,  -- [RO]文章のID
             opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
-            powbits INTEGER NOT NULL --[RO]登録時のPOWビット数
+            pownonce INTEGER NOT NULL --[RO]登録時に使用したNonce
         );
         ";
 
         $this->db->exec($sql);
     }
-    // データをjson_storageテーブルに挿入
-    public function insert(int $idAccount, int $idJsonStorage,int $opCode,int $powbits)
+    /**
+     * アカウントIDについて、最終更新レコードを得る。
+     * @param int $id_account
+     * @return null or
+     */
+    public function selectLatestByAccount(int $id_account):JsonStorageHistoryRow
+    {
+        // SQLクエリ
+        $sql = "
+            SELECT * FROM {$this->name} 
+            WHERE id_account = :id_account 
+            ORDER BY created_date DESC 
+            LIMIT 1
+        ";
+        // クエリの実行
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':id_account', $id_account, PDO::PARAM_INT);
+        $stmt->execute();
+        return  $stmt->fetchObject('Jsonpost\db\tables\JsonStorageHistoryRow');
+    }
+
+    /**
+     * 新しいレコードを追加
+     * @param int $idAccount
+     * @param int $idJsonStorage
+     * @param int $opCode
+     * @param int $pownonce
+     * @return void
+     */
+    public function insert(int $idAccount, int $idJsonStorage,int $opCode,int $pownonce)
     {
         // 現在のUnixタイムスタンプを取得
         $createdDate = time();
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode,powbits)
-        VALUES (:created_date, :id_account, :id_json_storage,:opcode,:powbits);
+        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode,pownonce)
+        VALUES (:created_date, :id_account, :id_json_storage,:opcode,:pownonce);
         ";
 
         $stmt = $this->db->prepare($sql);
@@ -47,7 +88,7 @@ class JsonStorageHistory
         $stmt->bindParam(':id_account', $idAccount);
         $stmt->bindParam(':id_json_storage', $idJsonStorage);
         $stmt->bindParam(':opcode', $opCode);
-        $stmt->bindParam(':powbits', $powbits);
+        $stmt->bindParam(':pownonce', $pownonce);
         $stmt->execute();
     }
 }
