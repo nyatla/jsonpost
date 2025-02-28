@@ -102,9 +102,7 @@ class PowStamp:
 
 
     @classmethod
-    def verify(cls,stamp:"PowStamp",server_domain:Optional[str]=None,payload:Optional[bytes]=None,pow_score:int=0)->bool:
-        if stamp.score<pow_score:
-            return False
+    def verify(cls,stamp:"PowStamp",server_domain:Optional[str]=None,payload:Optional[bytes]=None)->bool:
         psm=PowStampMessage.create(
             stamp.ecdsaPubkey,
             stamp.nonce,

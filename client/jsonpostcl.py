@@ -267,30 +267,35 @@ class JsonpostCl:
             sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
             sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
             sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
-            sp.add_argument("--pow-algorithm", type=str, required=False, default='tlsln(10,16,.8)', help="Pow difficulty detection algorithm.")
+            sp.add_argument("--pow-algorithm", type=str, required=False, default='tlsln(10,16,0.8)', help="Pow difficulty detection algorithm.")
             sp.set_defaults(func=JsonpostCl.AdminKonnichiwaCommand)
 
 
-    class VersionCommand(CommandBase):
+
+
+    class StatusCommand(CommandBase):
         def execute(self):
-            url = f"{self.args.endpoint}/version.php"  # endpointからversion.phpにアクセス
-            response = requests.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                if data["success"] == True:
-                    version = data["result"]["version"]
-                    print(f"System version: {version}")
-                else:
-                    print("Error: Failed to fetch version.")
+            url = f"{self.args.endpoint}/status.php"  # endpointからversion.phpにアクセス
+            response=None
+            if self.args.account:
+                config = JsonpostCl.AppConfig.load(self.args.config)
+                powstamp=config.generatePoWStamp(299,self.args.server_name,None,0)
+                headers = {
+                    "PowStamp-1":powstamp.stamp.hex(),
+                }
+                response = requests.get(url,headers=headers)
             else:
-                print("Error: Unable to connect to the version API.")
+                response = requests.get(url)
+            print(response.json())
 
         @classmethod
         def add_arguments(cls, subparsers):
-            version_parser = subparsers.add_parser("version", help="Display version")
-            version_parser.add_argument("endpoint", type=str, help="The base URL endpoint for version API")
-            version_parser.set_defaults(func=JsonpostCl.VersionCommand)
-
+            sp = subparsers.add_parser("status", help="Display status")
+            sp.add_argument("endpoint", type=str, help="The base URL endpoint for status API")
+            sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
+            sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
+            sp.add_argument("-A","--account", action="store_true", help="Enable account infomation.")
+            sp.set_defaults(func=JsonpostCl.StatusCommand)
     @staticmethod
     def main(args:List[str]):
 
@@ -298,8 +303,8 @@ class JsonpostCl:
         commands = [
             JsonpostCl.InitCommand,
             JsonpostCl.UploadCommand,
-            JsonpostCl.VersionCommand,
-            JsonpostCl.AdminKonnichiwaCommand
+            JsonpostCl.AdminKonnichiwaCommand,
+            JsonpostCl.StatusCommand
         ]
         parser = argparse.ArgumentParser(description="JSONPOST CUI Client")
         subparsers = parser.add_subparsers(dest="command")

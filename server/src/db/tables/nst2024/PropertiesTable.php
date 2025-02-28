@@ -15,11 +15,16 @@ class PropertiesRows {
     public int $root_pow_accept_time;
 
     public function __construct(array $data) {
-        $this->version = $data[PropertiesTable::VNAME_VERSION];
-        $this->god = $data[PropertiesTable::VNAME_GOD];
-        $this->pow_algorithm = $data[PropertiesTable::VNAME_POW_ALGORITHM];
-        $this->server_name = $data[PropertiesTable::VNAME_SERVER_NAME];
-        $this->root_pow_accept_time =  (int)$data[PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME];
+        $a=[];
+        foreach($data as $k){
+            $a[$k[0]]=$k[1];
+        } 
+
+        $this->version = $a[PropertiesTable::VNAME_VERSION];
+        $this->god = $a[PropertiesTable::VNAME_GOD];
+        $this->pow_algorithm = $a[PropertiesTable::VNAME_POW_ALGORITHM];
+        $this->server_name = $a[PropertiesTable::VNAME_SERVER_NAME];
+        $this->root_pow_accept_time =  (int)$a[PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME];
     }
 }
 
@@ -96,7 +101,7 @@ class PropertiesTable
         return $result;
     }
     public function selectAllAsObject():PropertiesRows{
-        return new PropertiesRows(($this->selectAll()));
+        return new PropertiesRows(($this->selectAll(PDO::FETCH_NUM)));
     }
 
     

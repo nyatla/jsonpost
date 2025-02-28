@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * POWSTAMPがある場合はaccountの情報も得られる。
+ */
 
 
 
@@ -15,9 +17,8 @@ use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResul
 use Jsonpost\db\tables\nst2024\{PropertiesTable};
 use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
 
-use Jsonpost\utils\{
-    ApplicationInstance,
-};
+
+
 use Jsonpost\endpoint\{
     RawStampRequiredEndpoint
 };
@@ -56,7 +57,7 @@ try{
         ],
         'account'=>$account_block
     ];
-    (new SuccessResultResponseBuilder($r))->sendResponse();
+    (new SuccessResultResponseBuilder($r,JSON_PRETTY_PRINT))->sendResponse();
 }catch(ErrorResponseBuilder $exception){
     $exception->sendResponse();
 }catch(Exception $e){
