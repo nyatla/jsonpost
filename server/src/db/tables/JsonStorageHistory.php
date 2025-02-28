@@ -12,6 +12,7 @@ class JsonStorageHistoryRow{
     public int $id_json_storage;
     public int $opcode;
     public int $pownonce;
+    public int $pownonce_required;
     // カラム名とプロパティ名が一致している必要があります
     // 名前が異なる場合は、SQL側でエイリアスを使用するか、__set()マジックメソッドで対応します
 }
@@ -37,7 +38,8 @@ class JsonStorageHistory
             id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
             id_json_storage INTEGER NOT NULL,  -- [RO]文章のID
             opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
-            pownonce INTEGER NOT NULL --[RO]登録時に使用したNonce
+            pownonce INTEGER NOT NULL, --[RO]登録時に使用したPowNonce
+            pownonce_required INTEGER NOT NULL --[RO]登録時に必要だったPowNonce
         );
         ";
 
@@ -72,15 +74,13 @@ class JsonStorageHistory
      * @param int $pownonce
      * @return void
      */
-    public function insert(int $idAccount, int $idJsonStorage,int $opCode,int $pownonce)
+    public function insert(int $createdDate,int $idAccount, int $idJsonStorage,int $opCode,int $pownonce,int $pownonce_required)
     {
-        // 現在のUnixタイムスタンプを取得
-        $createdDate = time();
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode,pownonce)
-        VALUES (:created_date, :id_account, :id_json_storage,:opcode,:pownonce);
+        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode,pownonce,pownonce_required)
+        VALUES (:created_date, :id_account, :id_json_storage,:opcode,:pownonce,:pownonce_required);
         ";
 
         $stmt = $this->db->prepare($sql);
@@ -89,6 +89,8 @@ class JsonStorageHistory
         $stmt->bindParam(':id_json_storage', $idJsonStorage);
         $stmt->bindParam(':opcode', $opCode);
         $stmt->bindParam(':pownonce', $pownonce);
+        $stmt->bindParam(':pownonce_required', $pownonce_required);
+
         $stmt->execute();
     }
 }

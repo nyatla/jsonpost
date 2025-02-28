@@ -4,19 +4,29 @@ namespace Jsonpost\utils;
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
 use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
 use Jsonpost\utils\pow\TimeSizeDifficultyBuilder;
+use Jsonpost\utils\ecdsasigner\PowStamp;
+use Jsonpost\responsebuilder\ErrorResponseBuilder;
 
-use \Exception as Exception;
+use Exception;
 /**
  * データベースロックは考慮してないから書込みAPI使うときはちゃんとトランザクションはって
  */
 class ApplicationInstance
 {
+
+    
+
+
+
+
+
+
     private \PDO $db;
     private PropertiesTable $pt;
     public readonly Array $properties_records;
     public function __construct($db) {
         $pt=new PropertiesTable($db);
-        $this->properties_records=$pt->selectAllAsAssoc();
+        $this->properties_records=$pt->selectAll();
         $this->pt=$pt;
         $this->db=$db;
     }

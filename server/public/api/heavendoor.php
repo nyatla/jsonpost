@@ -13,7 +13,7 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 // use JsonPost;
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
-use Jsonpost\utils\ecdsasigner\{PowStamp};
+use Jsonpost\endpoint\{ZeroStampEndpoint};
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
 use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
 use Jsonpost\db\views\{JsonStorageView};
@@ -25,50 +25,42 @@ use Jsonpost\db\views\{JsonStorageView};
 
 
 
-
 function apiMain($db,string $rawData): IResponseBuilder
 {
-
-    $powstamp1 = $_SERVER['HTTP_POWSTAMP_1'] ?? null;
+    //JSONペイロードの評価
     $request = json_decode($rawData, true);
     if ($request === null) {
-        throw new ErrorResponseBuilder("Invalid JSON format.");
+        ErrorResponseBuilder::throwResponse(301,'Invalid JSON format.');
     }
     foreach(['version','params']as $v){
         if(!array_key_exists($v,$request)){
-            throw new ErrorResponseBuilder("Invalid JSON $.$v not found.");
+            ErrorResponseBuilder::throwResponse(302,"Parameter $.$v not found.");
         }
     } 
     foreach(['server_name']as $v){
         if(!array_key_exists($v,$request['params'])){
-            throw new ErrorResponseBuilder("Invalid JSON params. $.params.$v not found.");
+            ErrorResponseBuilder::throwResponse(302,"Parameter $.params.$v not found.");
         }
     } 
     $version = $request['version'];
     $params=$request['params'];
     if($version!="urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1"){
-        throw new ErrorResponseBuilder("Invalid version");
-    }        
-    //スタンプの読出し
-    $ps=null;
+        ErrorResponseBuilder::throwResponse(303,"Parameter $.params.$v not found.");
+    }
+    $algorithm_name=$params[PropertiesTable::VNAME_POW_ALGORITHM] ??null;
+    if(!$algorithm_name){
+        ErrorResponseBuilder::throwResponse(302,'Pow algorithm not set.');
+    }
+    $pow_algorithm=null;
     try{
-        $ps=new PowStamp(hex2bin($powstamp1));
-        if($ps->getNonceAsInt()!=0){
-            throw new ErrorResponseBuilder("Invalid Nonde");
-        }
-        if(!PowStamp::verify($ps,$params['server_name'],$rawData,0)){
-            throw new Exception('PowStamp verify failed');
-        }
-    } catch (Exception $e) {
-        throw new ErrorResponseBuilder( $e->getMessage());
+        $pow_algorithm=TimeSizeDifficultyBuilder::fromText($algorithm_name);
+    }catch(Exception $e){
+        ErrorResponseBuilder::throwResponse(303,"Unknown algorihm '$algorithm_name'");
     }
-    if(!isset($params[PropertiesTable::VNAME_POW_ALGORITHM])){
-        throw new Exception('Pow algorithm not set.');
-    }
-    $pow_algorithm=TimeSizeDifficultyBuilder::fromText($params[PropertiesTable::VNAME_POW_ALGORITHM]);
 
+    $endpoint=new ZeroStampEndpoint($params['server_name'],$rawData);
     
-    $pubkey_hex=bin2hex($ps->getEcdsaPubkey());
+    $pubkey_hex=bin2hex($endpoint->stamp->getEcdsaPubkey());
 
     // テーブルがすでに存在するかを確認
     $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
@@ -76,7 +68,7 @@ function apiMain($db,string $rawData): IResponseBuilder
     
     // properties テーブルが存在しない場合、初期化を実行
     if ($result->fetch()) {
-        throw new ErrorResponseBuilder("Already initialized.");
+        ErrorResponseBuilder::throwResponse(501);
     }
     $t1=new PropertiesTable($db);
     $t1->createTable();
@@ -90,7 +82,7 @@ function apiMain($db,string $rawData): IResponseBuilder
     $t2=new DbSpecTable($db);
     $t2->createTable();
 
-    $t1->insert('version',Config::VERSION);
+    $t1->insert(PropertiesTable::VNAME_VERSION,Config::VERSION);
     $t1->insert(PropertiesTable::VNAME_GOD,$pubkey_hex);    //管理者キー
     $t1->insert(PropertiesTable::VNAME_SERVER_NAME,$params['server_name']); //サーバー識別名
     $t1->insert(PropertiesTable::VNAME_POW_ALGORITHM,$pow_algorithm->serialize());    //Diffアルゴリズム識別子
@@ -122,19 +114,21 @@ $db->exec('BEGIN IMMEDIATE');
 try{
     switch($_SERVER['QUERY_STRING']){
         case 'konnichiwa':{
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                ErrorResponseBuilder::throwResponse(101,status:405);
+            }
             // POSTリクエストからJSONデータを取得
             $rawData = file_get_contents('php://input');
             // $rawData = file_get_contents('./upload_test.json');
-            if(strlen($rawData)>1024){
-                throw new ErrorResponseBuilder("upload data too large.");
+            if(strlen($rawData)>2048){
+                ErrorResponseBuilder::throwResponse(301,"upload data too large.",413);
             }
-            // データベースのセットアップ
-            
+            // データベースのセットアップ            
             apiMain($db,$rawData)->sendResponse();
             break;
         }
         default:{
-            throw new ErrorResponseBuilder("The door to heaven is closed. ");
+            ErrorResponseBuilder::throwResponse(101,"The door to heaven is closed. ");
         }
     }
     $db->exec("COMMIT");
@@ -143,9 +137,8 @@ try{
     $e->sendResponse();
 }catch (Exception $e) {
     $db->exec("ROLLBACK");
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }catch(Error $e){
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    // (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }
 

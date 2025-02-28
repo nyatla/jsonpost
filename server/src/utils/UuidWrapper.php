@@ -4,7 +4,7 @@ namespace Jsonpost\utils;
 
 
 use Ramsey\Uuid\{Uuid,UuidInterface};
-use \Exception as Exception;
+use Exception;
 
 
 class UuidWrapper {

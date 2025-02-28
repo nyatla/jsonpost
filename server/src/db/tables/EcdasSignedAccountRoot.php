@@ -2,8 +2,9 @@
 namespace Jsonpost\db\tables;
 
 use Jsonpost\db\tables\nst2024\PropertiesTable;
+use Jsonpost\responsebuilder\ErrorResponseBuilder;
 use \PDO as PDO;
-use \Exception as Exception;
+use Exception;
 use \Jsonpost\utils\UuidWrapper;
 
 
@@ -18,6 +19,9 @@ class EcdasSignedAccountRootRecord {
     public readonly int $is_new_record;
     public function __construct($is_new_record){
         $this->is_new_record = $is_new_record;
+    }
+    public function uuidAsText(): string{
+        return UuidWrapper::loadFromBytes($this->uuid);
     }
 }
 
@@ -41,7 +45,7 @@ class EcdasSignedAccountRoot
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pubkey BLOB NOT NULL UNIQUE,   --[RO] ecdasのrecoverkey[0]
             uuid BLOB NOT NULL UNIQUE,     --[RO] ユーザー識別のためのuuid
-            nonce INTEGER NOT NULL         --[RW] 署名データの下位8バイト(nonce)
+            nonce INTEGER NOT NULL            --[RW] 署名データの下位8バイト(stamp_nonce)
         );
         ";
         $this->db->exec($sql);
@@ -95,39 +99,40 @@ class EcdasSignedAccountRoot
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$pubkey, $uuid, $nonce]);
     }
-    public function updateNonce($id, $newNonce)
+    public function updateRecord($id, int $nonce)
     {
-        // 新しいnonceを指定したpubkeyに対して更新する
+        // id をキーにして nonce と powtime を同時に更新する
         $sql = "UPDATE $this->name SET nonce = ? WHERE id = ?;";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$newNonce, $id]);
+        $stmt->execute([$nonce, $id]);
     }
 
-    public function getNonceById($id): mixed
-    {
-        // id で検索して nonce を取得
-        $sql = "SELECT nonce FROM $this->name WHERE id = ? LIMIT 1;";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$id]);
-        $nonce = $stmt->fetchColumn();
-    
-        // nonce が見つからない場合
-        if ($nonce === false) {
-            throw new Exception("指定された id のレコードが見つかりません。");
-        }
-    
-        // nonce を返す
-        return $nonce;
-    }
 
+    
     // uuidによるアカウントの検索
-    public function getAccountByUuid($uuid):EcdasSignedAccountRootRecord
+    public function selectAccountByUuid($uuid):EcdasSignedAccountRootRecord
     {
         $sql = "
         SELECT * FROM $this->name WHERE uuid = ?;
         ";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$uuid]);
-        return $stmt->fetchObject('EcdasSignedAccountRootRecord',[false]);
+        $ret=$stmt->fetchObject('Jsonpost\db\tables\EcdasSignedAccountRootRecord',[false]);
+        if ($ret === false) {
+            ErrorResponseBuilder::throwResponse(401);
+        }
+        return $ret;        
+    }
+    public function selectAccountByPubkey(string $pubkey):EcdasSignedAccountRootRecord
+    {
+        $sql = "SELECT * FROM $this->name WHERE pubkey = ? LIMIT 1;";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$pubkey]);
+        $ret=$stmt->fetchObject('Jsonpost\db\tables\EcdasSignedAccountRootRecord',[false]);
+        // nonce が見つからない場合
+        if ($ret === false) {
+            ErrorResponseBuilder::throwResponse(401);
+        }
+        return $ret;
     }
 }

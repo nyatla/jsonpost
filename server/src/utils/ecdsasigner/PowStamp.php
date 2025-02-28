@@ -45,26 +45,31 @@ class PowStamp {
     public function getHash(): string {
         return hash('sha256', hash('sha256', $this->stamp, true), true);
     }
-    
-    public function getScore(): int {
-        $h = $this->getHash();
-        $bitCount = 0;
-        foreach (str_split($h) as $byte) {
-            $value = ord($byte);
-            if ($value === 0) {
-                $bitCount += 8;
-            } else {
-                $bitCount += (8 - log($value, 2));
-                break;
-            }
-        }
-        return (int)$bitCount;
+    public function getPowScore32(): int {
+        return unpack('N', substr($this->getHash(), 0, 4))[1];
     }
     
-    public static function verify(self $stamp, ?string $serverDomain = null, ?string $payload = null, int $powScore = 0): bool {
-        if ($stamp->getScore() < $powScore) {
-            return false;
-        }
+    // public function getScore(): int {
+    //     $h = $this->getHash();
+    //     $bitCount = 0;
+    //     foreach (str_split($h) as $byte) {
+    //         $value = ord($byte);
+    //         if ($value === 0) {
+    //             $bitCount += 8;
+    //         } else {
+    //             $bitCount += (8 - log($value, 2));
+    //             break;
+    //         }
+    //     }
+    //     return (int)$bitCount;
+    // }
+    /**
+     * 署名が適切か評価する。
+     * @param mixed $serverDomain
+     * @param mixed $payload
+     * @return bool
+     */
+    public static function verify(self $stamp, ?string $serverDomain = null, ?string $payload = null): bool {
         $psm = PowStampMessage::create(
             $stamp->getEcdsaPubkey(),
             $stamp->getNonce(),

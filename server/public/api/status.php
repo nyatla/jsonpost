@@ -3,6 +3,7 @@
 
 
 
+
 require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
 
@@ -10,51 +11,57 @@ use Jsonpost\Config;
 
 
 
-use Jsonpost\responsebuilder\{
-    IResponseBuilder,
-    ErrorResponseBuilder,
-    SuccessResultResponseBuilder
-};
-use Jsonpost\db\tables\nst2024\{
-    PropertiesTable
-};
+use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
+use Jsonpost\db\tables\nst2024\{PropertiesTable};
+use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
+
 use Jsonpost\utils\{
     ApplicationInstance,
+};
+use Jsonpost\endpoint\{
+    RawStampRequiredEndpoint
 };
 
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
-$db->exec('BEGIN IMMEDIATE');
-
 try{
     //前処理
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-        (new ErrorResponseBuilder("Method Not Allowed",405))->sendResponse();
+        ErrorResponseBuilder::throwResponse(101,status:405);
     }
-    $app=new ApplicationInstance($db);
-    $properties=$app->properties_records;
+    $prop_tbl=new PropertiesTable($db);
+    $properties=$prop_tbl->selectAllAsObject();
+    $account_block=null;
+    if(isset($_SERVER['HTTP_POWSTAMP_1'])){
+        //スタンプがついてたらaccountの情報も取る
+        $endpoint=new RawStampRequiredEndpoint(server_name: $properties->server_name,rawData: null);
+        #ここに段階右折してるから後で直して
+        $act=new EcdasSignedAccountRoot($db);
+        $act_rec=$act->selectAccountByPubkey($endpoint->stamp->getEcdsaPubkey());
+        $acth=new JsonStorageHistory($db);
+        $acth_rec=$acth->selectLatestByAccount($act_rec->id);
+        $account_block=[
+            'latest_pow_time'=>$acth_rec->created_date
+        ];
+    }
 
     $r=[
         'welcome'=>[
-            'version'=>$properties[PropertiesTable::VNAME_VERSION],
-            'server-name'=>$properties[PropertiesTable::VNAME_SERVER_NAME],
-            // 'difficulty'=>$app->update(null)[1],
+            'version'=>$properties->version,
+            'server_name'=>$properties->server_name,
+            'powstamp'=>$properties->pow_algorithm,
         ],
-        'operation'=>[
-        ],    
+        'root'=>[
+            'latest_pow_time'=>$properties->root_pow_accept_time,
+        ],
+        'account'=>$account_block
     ];
-    $db->exec("COMMIT");    
     (new SuccessResultResponseBuilder($r))->sendResponse();
 }catch(ErrorResponseBuilder $exception){
-    $db->exec("ROLLBACK");
     $exception->sendResponse();
 }catch(Exception $e){
-    $db->exec("ROLLBACK");    
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    // (new ErrorResponseBuilder("Internal Error"))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }catch(Error $e){
-    $db->exec("ROLLBACK");    
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    // (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }
 

@@ -4,7 +4,24 @@
 namespace Jsonpost\db\tables\nst2024;
 
 use PDO;
-use \Exception as Exception;
+use Exception;
+use \Jsonpost\responsebuilder\ErrorResponseBuilder;
+
+class PropertiesRows {
+    public string $version;
+    public string $god;
+    public string $pow_algorithm;
+    public ?string $server_name;
+    public int $root_pow_accept_time;
+
+    public function __construct(array $data) {
+        $this->version = $data[PropertiesTable::VNAME_VERSION];
+        $this->god = $data[PropertiesTable::VNAME_GOD];
+        $this->pow_algorithm = $data[PropertiesTable::VNAME_POW_ALGORITHM];
+        $this->server_name = $data[PropertiesTable::VNAME_SERVER_NAME];
+        $this->root_pow_accept_time =  (int)$data[PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME];
+    }
+}
 
 class PropertiesTable
 {
@@ -61,11 +78,11 @@ class PropertiesTable
 
         // レコードが存在しない場合は例外をスロー
         if (!$result) {
-            throw new Exception("No data. name:{$name}");
+            ErrorResponseBuilder::throwResponse(401);
         }
         return $result[0];
     }
-    public function selectAll(int $mode)
+    public function selectAll(int $mode=PDO::FETCH_ASSOC)
     {
         $indexSql = "
         SELECT name,value
@@ -78,13 +95,11 @@ class PropertiesTable
 
         return $result;
     }
-    public function selectAllAsAssoc():array{
-        $r=[];
-        foreach($this->selectAll(PDO::FETCH_NUM) as $v){
-            $r[$v[0]] = $v[1];
-        }
-        return $r;
+    public function selectAllAsObject():PropertiesRows{
+        return new PropertiesRows(($this->selectAll()));
     }
+
+    
     public function updateParam(string $name, string $value)
     {
         // SQLクエリを準備
@@ -98,11 +113,6 @@ class PropertiesTable
         $stmt->bindValue(':value', $value, PDO::PARAM_STR);
         
         // クエリを実行
-        $stmt->execute();
-        
-        // 更新がなかった場合の処理
-        if ($stmt->rowCount() === 0) {
-            throw new Exception("Update failed: No matching rows found.");
-        }
+        $stmt->execute();        
     }
 }

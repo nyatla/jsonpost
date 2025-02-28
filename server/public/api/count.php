@@ -12,8 +12,6 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 // use JsonPost;
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
-use Jsonpost\db\views\{JsonStorageView};
-use Jsonpost\utils\{UuidWrapper};
 
 
 
@@ -22,26 +20,19 @@ function apiIndexMain($db,$index,$limit,$filter,$value): IResponseBuilder
 {
     $v=new JsonStorage($db);
     $ret=$v->countWithFilter($index, $limit,$filter,$value);
-
-    
-
     return new SuccessResultResponseBuilder($ret);
 }
 
 
 
 
-
-
-
-
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    (new ErrorResponseBuilder("Method Not Allowed",405))->sendResponse();
-}
-
 // SQLiteデータベースに接続
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 try{
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        ErrorResponseBuilder::throwResponse(101,status:405);
+    }
+    
     $limit=null;
     if(isset($_GET['limit'])){
         $limit=intval($_GET['limit']);
@@ -51,7 +42,7 @@ try{
     $keys=['index', 'page'];
     $count = count(array_filter($keys, fn($p) => isset($_GET[$p])));
     if ($count > 1) {
-        new ErrorResponseBuilder('Please set one of '.implode(',', $keys),405);
+        ErrorResponseBuilder::throwResponse(103,'Please set one of '.implode(',', $keys),400);
     }
     $path=$_GET['path'] ?? null;
     $value=$_GET['value'] ?? null;
@@ -69,8 +60,8 @@ try{
 }catch(ErrorResponseBuilder $e){
     $e->sendResponse();
 }catch (Exception $e) {
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }catch(Error $e){
-    (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }
 

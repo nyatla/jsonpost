@@ -3,7 +3,7 @@
 
 namespace Jsonpost\responsebuilder;
 
-use \Exception as Exception;
+use Exception;
 interface IResponseBuilder{
     public function sendResponse();
 }

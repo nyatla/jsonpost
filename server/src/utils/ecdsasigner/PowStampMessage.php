@@ -2,7 +2,7 @@
 namespace Jsonpost\utils\ecdsasigner;
 
 use Jsonpost\utils\ecdsasigner\EasyEcdsaSignature;
-use \Exception as Exception;
+use Exception;
 
 class PowStampMessage {
     /**

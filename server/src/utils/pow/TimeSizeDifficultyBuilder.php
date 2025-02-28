@@ -1,6 +1,6 @@
 <?php
 namespace Jsonpost\utils\pow;
-use \Exception as Exception;
+use Exception;
 
 
 class TimeLogiticsSizeLnDifficulty implements ITimeSizeDifficultyProvider{

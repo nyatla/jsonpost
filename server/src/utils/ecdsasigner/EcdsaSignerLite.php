@@ -2,7 +2,7 @@
 namespace Jsonpost\utils\ecdsasigner;
 
 use Elliptic\EC;
-use \Exception as Exception;
+use Exception;
 
 
 

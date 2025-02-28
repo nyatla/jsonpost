@@ -2,8 +2,9 @@
 namespace Jsonpost\db\tables;
 
 use \PDO as PDO;
-use \Exception as Exception;
+use Exception;
 use \Jsonpost\utils\UuidWrapper;
+use \Jsonpost\responsebuilder\ErrorResponseBuilder;
 
 
 
@@ -17,6 +18,10 @@ class JsonStorageRecord {
     public function __construct($is_new_record){
         $this->is_new_record = $is_new_record;
     }
+    public function uuidAsText(): string{
+        return UuidWrapper::loadFromBytes($this->uuid);
+    }
+
 }
 class JsonStorage
 {
@@ -110,8 +115,7 @@ class JsonStorage
 
         // レコードが存在しない場合は例外をスロー
         if (!$result) {
-            $u=UuidWrapper::bin2text($uuid);
-            throw new Exception("No data. uuid:{$u}");
+            ErrorResponseBuilder::throwResponse(401);
         }
         return $result;
     }

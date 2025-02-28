@@ -51,15 +51,16 @@ function apiIndexMain($db,$uuid,$path,$is_raw): IResponseBuilder
 }
 
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    (new ErrorResponseBuilder('Method Not Allowed',405))->sendResponse();
-}
 
 // SQLiteデータベースに接続
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 try{
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        ErrorResponseBuilder::throwResponse(101,status:405);
+    }
+    
     if(!isset($_GET['uuid'])){
-        throw new ErrorResponseBuilder("Invalid query",405);
+        ErrorResponseBuilder::throwResponse(102);
     }
     $ret=apiIndexMain(
         $db,
@@ -71,8 +72,7 @@ try{
 }catch(ErrorResponseBuilder $e){
     $e->sendResponse();
 }catch (Exception $e) {
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }catch(Error $e){
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    // (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }

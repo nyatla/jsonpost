@@ -36,11 +36,9 @@ try{
 }catch(ErrorResponseBuilder $exception){
     $exception->sendResponse();
 }catch(Exception $e){
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    // (new ErrorResponseBuilder("Internal Error"))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }catch(Error $e){
-    (new ErrorResponseBuilder($e->getMessage()))->sendResponse();
-    // (new ErrorResponseBuilder('Internal Error.'))->sendResponse();
+    ErrorResponseBuilder::catchException($e)->sendResponse();
 }
 
 
