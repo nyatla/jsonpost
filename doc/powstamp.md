@@ -1,117 +1,196 @@
-# POWSTAMP
+# PowStamp仕様
 
-POWSTAMPは、クライアントがサーバーに送信するバイトストリームです。
-このデータはクライアントがサーバーにリクエストの正当性を説明する目的で作成して送信します。
-基本的には1回限りの使い捨ての情報です。 APIが受理されるたび作り直す必要があります。
+PowStampは、クライアントがサーバーに送信するバイトストリームです。
+このデータは、クライアントがリクエストの正当性を証明するために作成し、送信します。
+基本的には1回限りの使い捨て情報であり、APIが受理されるたびに新しく生成する必要があります。
+
+PowStampの `sha256d` 値は、PowStampのスコア値として定義されます。
+この値の先頭32ビットが評価対象となり、目標値に調整するためにハッシングを行います。
+
+## データ形式
+
+PowStampには、認証情報としての `PowStamp` と、署名情報を作成するための `PowStampMessage` の2種類のデータ構造があります。
+
+### PowStamp
+
+`PowStamp` は、以下の3つの要素で構成されます。
+
+- **ECDSA署名 (`PowStampSignature`)**
+- **ECDSA署名を検証するためのメッセージ (`PowStampMessage`)**
+- **PoWハッシングで得る `PowNonce`**
+
+クライアントは、初回の通信時に永続的に有効なECDSAのプライベートキーを生成し、これを用いて署名を行います。
+
+| フィールド名            | サイズ(byte) | 説明                                  |
+|------------------|------------|---------------------------------|
+| PowStampSignature | 64         | `ECDSA.sign(PowStampMessage)` の結果 |
+| EcdsaPublicKey   | 33         | 圧縮形式のECDSA公開鍵                  |
+| Nonce            | 4          | メッセージNonce                        |
+| PowNonce         | 4          | ハッシング調整用Nonce                  |
+| **total**        | **105**    | 合計バイト数                            |
 
 
+ECDSA署名のK値は固定するべきではありません。これはPoWStampが同一な署名の使用制限しないためです。
+
+### PowStampMessage
+
+`PowStampMessage` は `PowStampSignature` の署名対象となるメッセージです。
+このメッセージは、サーバー由来の情報とクライアント由来の情報を一定の方式で連結して作成します。
+
+| フィールド名            | サイズ(byte) | 説明                                  |
+|------------------|------------|---------------------------------|
+| EcdsaPublicKey   | 33         | プレフィクス付きECDSA公開鍵                |
+| Nonce            | 4          | メッセージNonce                        |
+| ServerDomainHash | 32         | サーバー名のSHA256ハッシュ               |
+| PayloadHash      | 32         | 送信ペイロードのSHA256ハッシュ            |
+| **total**        | **101**    | 合計バイト数                            |
+
+ServerDomainHash は、サーバーから提供されるドメイン名のSHA256ハッシュです。
+Publicサーバーの場合は `sha256(0[32])` を指定します。
+PayloadHash は、PowStampと共に送信されるペイロードのSHA256ハッシュ値です。
+ペイロードを持たない場合は `sha256(0[32])` を指定します。
+
+## PowStampのスコア
+
+`sha256d(PowStamp)` の結果の先頭32ビットを `big-endian UINT` として解釈した値がスコア値です。
+サーバーはこの値を閾値と比較し、閾値以下であれば有効なPowStampとして受理します。
+
+閾値は動的に変更可能であり、サーバーから提供されるAPIで取得できます。
+
+### 難易度計算
+
+PowStampのスコアは閾値として使用されますが、ハッシングの難易度として直感的に理解しにくいため、以下の計算式で[0,32]の範囲に変換できます。
+
+```
+DIFF = (0xffffffff - SCORE_TH)
+```
+
+また、先頭から揃えるべき0のビット数は以下の式で求めます。
+
+```
+DIFF_BITS = floor(log2(0xffffffff - SCORE_TH))
+```
+
+### 閾値計算アルゴリズム
+
+サーバーのPowStampスコアの閾値は、リクエストごとに計算される適正度 `R` を基に決定されます。
+
+```
+難易度閾値 = pow(2, (R * 32))
+```
+
+#### TimeLogiticsSizeLogNormal
+
+汎用的なファイルアップロードで適正な利用頻度と容量を求める難易度設定です。
+ファイルサイズはリクエストから、経過時間はサーバの記録値から求めます。
+
+この方式では、アップロードファイルサイズ の適正率(`PSR`) とアップロード間隔適正率 (`ETR`) の2つのパラメータで決定します。
+
+- `PSR`: ファイルサイズを目標ファイルサイズと対数正規分布に基づいて[0,1]に正規化した値
+- `ETR`: アップロード間隔（時間）をロジスティック関数で[0,1]に変換した値
+- `適正度 R = PSR × ETR`
 
 
-## 構成
+##### シリアライズ
 
-POWSTAMPはECDSA署名(EcdsaSignature)、ECDSA署名を検証するためのメッセージ(Message)、PoWハッシングで得るPowNonce値(PowNonce)で構成します。
-署名を行うのはクライアントで、初回の通信時に永続的に有効なECDSAのプライベートキーを生成し、これにより署名を行います。
-
-
-**POWSTAMP**
-|フィールド名|サイズ(byte)||
-|--|--|--|
-|PowStampSignature|64|ECDSA.sign(PowStampMessage)|
-|EcdsaPublicKey|33|プレフィクス付キー|
-|Nonce|4|メッセージNonce|
-|PowNonce|4|ハッシングNonce|
-||||
-|total|105||
+APIのパラメータの表記方法は以下の通りです。
+```
+tlsln(e,s,s_sigma)
+```
+- **e** 秒単位のアップロード間隔目標値です。
+- **s** キロバイト単位のアップロードサイズ目標値です。
+- **s_sigma** アップロードサイズの対数正規分布のσ値です。
 
 
+## ハッシング
+
+目的のスコアを持つPowStampを得るには、PowStampのPowNonceフィールドの値を変更しながらsha256dの結果を評価するプロセスを繰り返します。目標をtarget_scoreとすると、以下の疑似コードで表現されます。これは確率的な探索になります。
+
+hash_baseはPowStampのPowNonceを除く101バイトです。
+
+```
+for i in range(0xffffffff):
+    pw=sha256(sha256(hash_base+struct.pack('>I', i)))
+    if unpack('>I', pw[0:4])[0]>target_score:
+        return pw
+```
+
+## 通知方式
+
+現在のバージョンでは、HTTPリクエストヘッダー `PowStamp-1` に `hex` 形式のPowStampを指定します。
+
+**リクエストの例**
+```
+GET /status.php HTTP/1.1
+User-Agent: python-requests/2.31.0
+Accept-Encoding: gzip, deflate, br
+Accept: */*
+Connection: keep-alive
+PowStamp-1: 1afe01c478b26b091e28568e921ba72fdfd253f0400deed94f482e9825113071034f8d917a1b18c2905dc68ad093188af3da4814f18998a751b0e291b38d4cb702cf751b15ce7de09d29aa612a48788b7ce576ba513a50c666404131d2988f57180000012b00000001
+```
 
 
+## 参考
+
+PowStampとPowStampMessageの生成例です。
+
+k値がランダムの為、署名の値は生成毎に異なります。
+
+```
+import os,sys
+import hashlib
+import struct
+from libs.powstamp import PowStamp,PowStampMessage
+from libs.ecdsa_utils import EcdsaSignner
+pk = b'0'*32
+nonce = 1
+server_domain = "TEST"
+payload = b"TEST"
+
+es=EcdsaSignner(pk)
+spubkey=EcdsaSignner.compressPubKey(es.public_key)
+sdhash=None if server_domain is None else hashlib.sha256(server_domain.encode()).digest()
+phash=None if payload is None else hashlib.sha256(payload).digest()
+
+sm=PowStampMessage.create(
+    spubkey,
+    struct.pack('>I', nonce),
+    sdhash,
+    phash,
+)
+hash_base=es.sign(sm.message)+spubkey+struct.pack('>I',nonce)
+pw=PowStamp(hash_base+struct.pack('>I', 0))
 
 
+print("**PowStampMessage**")
 
+print("EcdsaPublicKey",spubkey.hex())
+print("Nonce",sm.nonce.hex())
+print("ServerDomainHash",sdhash.hex())
+print("PayloadHash",phash.hex())
+print("Total",sm.message.hex())
 
-署名を行うメッセージは、サーバー由来とクライアント由来の２つがあり、それらを一定の方式で連結して作成します。
+print("**PowStamp**")
+print("PowStampSignature",pw.powStampSignature.hex())
+print("EcdsaPublicKey",pw.ecdsaPubkey.hex())
+print("Nonce",pw.nonce.hex())
+print("PowNonce",pw.powNonce.hex())
+print("Total",pw.stamp.hex())
+```
 
+```
 **PowStampMessage**
-|フィールド名|サイズ(byte)||
-|--|--|--|
-|EcdsaPublicKey|33|プレフィクス付キー|
-|Nonce|4|メッセージNonce|
-|ServerDomainHash(sha256)|32||
-|PayloadHash(sha256)|32||
-||||
-|total|101||
+EcdsaPublicKey 022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f51277
+Nonce 00000001
+ServerDomainHash 94ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2
+PayloadHash 94ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2
+Total 022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f512770000000194ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc294ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2
+**PowStamp**
+PowStampSignature 83c9175403510b8fc7c25ba6f66b42b8e50a17d87f4824660f96ffa9f3bf99f92cd513f7b2cb88e527be81da21f11ce29f8c43d4a1568133984f520c0e4ad74e
+EcdsaPublicKey 022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f51277
+Nonce 00000001
+PowNonce 00000000
+Total 83c9175403510b8fc7c25ba6f66b42b8e50a17d87f4824660f96ffa9f3bf99f92cd513f7b2cb88e527be81da21f11ce29f8c43d4a1568133984f520c0e4ad74e022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f512770000000100000000
 
-
-ServerDomainHashは、Publicサーバーの場合は0を指定します。
-PayloadHashは、ペイロードを持たない場合は0を指定します。
-
-
-
-結合した値を205文字のhex値として送信します。
-PowStampSignatureは以下のバイト列のSHA256ハッシュです。
-
-
-この２つのパラメータは、サーバー側の固有パラメータをリクエストの一部であるため、POW_STAMPには含まれません
-
-### POW_STAMPのスコア
-sha256d(POW_STAMP)で得たハッシュ値の先頭から32ビットのbigendian-UINTがスコア値です。
-この値はとして使われ、APIの実行時に内部の閾値と比較します。
-
-閾値は機能毎に異なり、APIが要求する閾値は/diff.phpで取得できます。
-
-
-# POW閾値（難易度）
-
-POW閾値はサーバによって計算されるハッシングの難易度です。サーバはPOW_STAMPのスコア値と比較し、POW_STAMPスコアが閾値を下回るリクエストだけを受理します。
-
-
-定義済の閾値は以下の通りです。
-
-## TimeLogiticsSizeLogNormal(e,s,s_sigma) 
-
-postペイロードのサイズと、前回のアップロードからの経過時間から計算します。
-初回のアップロードは最後の初回登録からの経過時間を代わりに用います。
-
-アップロードのドメインはrootとuserの2つがあり、rootはuserが不明な場合に使います。
-
-計算した値Rは、[0,1]の範囲にある確率値であり、これを以下の式で閾値に変換します。
-````
-難易度=(32*R)
-閾値=2^難易度
-````
-
-### 算出アルゴリズム
-
-postペイロードのサイズPAYLOAD_SIZEは、以下の変換式でレートPSに変換します。
-PSはピーク値で除算して[0,1]に正規化します。
-
-PS=対数標準偏差(PAYLOAD_SIZE,SIGMA,MU)
-
-パラメータ
-- SIGMA 対数標準偏差のσ値。
-- MU 収集するファイルサイズ分布の中心
-
-ファイルサイズがMUに近いほどPSの値が1に近づきます。
-
-
-経過時間ELAPSE_TIMEは以下の変換式でレートTに変換します。
-
-T=ロジスティック関数(ELAPSE_TIME,HALF_T_POINT)
-
-パラメータ
-- HALF_T_POINT ロジティクス関数の最大値の0.5倍に到達する経過時間です。目標経過時間の0.5倍を指定します。
-
-経過時間がHALF_T_POINTの2倍を超えると、Tの値は1に収束します。
-
-
-PSとTの積を計算し、[0,1]の値を得ます。この値は、経過時刻とファイルサイズが目標値に近い確率値になります。
-
-
-補正アルゴリズム（オプション）
-
-ハッシング性能の高いシステムが接続してきた場合、レートTが正しく機能しない場合があります。
-その場合、一時的にHALF_T_POINTをどうにかするひつようがあるからグラフ確認しながらやる。
-
-
+```
 

@@ -28,7 +28,7 @@ $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 try{
     //前処理
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-        ErrorResponseBuilder::throwResponse(101,status:405);
+        ErrorResponseBuilder::throwResponse(err_code: 101,status:405);
     }
     $prop_tbl=new PropertiesTable($db);
     $properties=$prop_tbl->selectAllAsObject();
@@ -42,6 +42,7 @@ try{
         $acth=new JsonStorageHistory($db);
         $acth_rec=$acth->selectLatestByAccount($act_rec->id);
         $account_block=[
+            'uuid'=>$act_rec->uuidAsText(),
             'latest_pow_time'=>$acth_rec->created_date
         ];
     }
@@ -50,7 +51,7 @@ try{
         'welcome'=>[
             'version'=>$properties->version,
             'server_name'=>$properties->server_name,
-            'powstamp'=>$properties->pow_algorithm,
+            'pow_algorithm'=>$properties->pow_algorithm,
         ],
         'root'=>[
             'latest_pow_time'=>$properties->root_pow_accept_time,

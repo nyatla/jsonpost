@@ -22,7 +22,7 @@ function apiIndexMain($db,$index,$limit,$filter,$value): IResponseBuilder
     $ret=$v->selectByIndexWithFilter($index, $limit,$filter,$value);
     $nitems=[];
     foreach($ret['items'] as $i) {
-        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2]),bin2hex($i[3])];
+        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2])];
     }
 
     return new SuccessResultResponseBuilder(
@@ -38,7 +38,7 @@ function apiIndexMain2($db,$uuid,$limit,$filter,$value): IResponseBuilder
     $ret=$v->selectByUuid($uuid, $limit,$filter,$value);
     $nitems=[];
     foreach($ret['items'] as $i) {
-        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2]),bin2hex($i[3])];
+        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2])];
     }
     return new SuccessResultResponseBuilder(
         ['total'=>$ret['total'],'items'=>$nitems]
