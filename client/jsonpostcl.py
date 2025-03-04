@@ -234,7 +234,7 @@ class JsonpostCl:
             # 設定ファイルの読み込み
             config = JsonpostCl.AppConfig.load(self.args.config)
             data = {
-                "version": "urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
+                "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
                 "params":{
                     "pow_algorithm":self.args.pow_algorithm,
                     "server_name":self.args.server_name
@@ -267,9 +267,57 @@ class JsonpostCl:
             sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
             sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
             sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
-            sp.add_argument("--pow-algorithm", type=str, required=False, default='tlsln(10,16,0.8)', help="Pow difficulty detection algorithm.")
+            sp.add_argument("--pow-algorithm", type=str, required=False, default='["tlsln",[10,16,0.8]]', help="Pow difficulty detection algorithm.")
             sp.set_defaults(func=JsonpostCl.AdminKonnichiwaCommand)
 
+
+    class AdminSetparamsCommand(CommandBase):
+        def execute(self):
+            # 設定ファイルの読み込み
+            config = JsonpostCl.AppConfig.load(self.args.config)
+            params={}
+            if self.args.pow_algorithm is not None:
+                params['pow_algorithm']=self.args.pow_algorithm
+            if self.args.new_server_name is not None:
+                params['server_name']=self.args.new_server_name if len(self.args.new_server_name)>0 else None
+            if len(params)==0:
+                print('No changes detected.')
+                return
+            
+            data = {
+                "version": "urn::nyatla.jp:json-request::jsonpost-setparams:1",
+                "params":params
+            }
+            d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
+            #スタンプの生成
+            ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0)
+            # ヘッダーの指定（charset=utf-8を指定）
+            headers = {
+                "Content-Type": "application/json; charset=utf-8",
+                "PowStamp-1":ps.stamp.hex(),
+            }
+
+            # アップロード先のエンドポイントに対してPOSTリクエストを送信
+            ep=f"{self.args.endpoint}/heavendoor.php?setparams"
+            print(f"Uploading to {ep}...")
+            response = requests.post(ep, data=d_json, headers=headers)
+
+            # 結果の表示
+            print(f"Response Status Code: {response.status_code}")
+            print(f"Response Content: {response.content.decode('utf-8')}")        
+
+
+
+        @classmethod
+        def add_arguments(cls, subparsers):
+            sp=subparsers.add_parser("setparams", help="Initialize server database.")
+            # upload コマンドの後に指定されるデータ
+            sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
+            sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
+            sp.add_argument("-S","--server-name", default=None, type=str, help="Current server domain name. default=None(public)")
+            sp.add_argument("--pow-algorithm", type=str, default=None, help="Pow difficulty detection algorithm.('[\"tlsln\",[10,16,0.8]]')")
+            sp.add_argument("--new-server-name", type=str, nargs="?", const="", default=None, help="New server domain name.")
+            sp.set_defaults(func=JsonpostCl.AdminSetparamsCommand)
 
 
 
@@ -286,7 +334,7 @@ class JsonpostCl:
                 response = requests.get(url,headers=headers)
             else:
                 response = requests.get(url)
-            print(response.json())
+            print(response.content.decode('utf-8'))
 
         @classmethod
         def add_arguments(cls, subparsers):
@@ -304,7 +352,8 @@ class JsonpostCl:
             JsonpostCl.InitCommand,
             JsonpostCl.UploadCommand,
             JsonpostCl.AdminKonnichiwaCommand,
-            JsonpostCl.StatusCommand
+            JsonpostCl.StatusCommand,
+            JsonpostCl.AdminSetparamsCommand,
         ]
         parser = argparse.ArgumentParser(description="JSONPOST CUI Client")
         subparsers = parser.add_subparsers(dest="command")

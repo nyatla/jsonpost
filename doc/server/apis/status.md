@@ -24,7 +24,10 @@ GET /status.php
         "welcome": {
             "version": "nyatla.jp:jsonpost:1",
             "server_name": null,
-            "pow_algorithm": "tlsln(5,16,0.8)"
+            "pow":{
+                "algolitm":"tlsln",
+                "params":[5,16,0.8]
+            }
         },
         "root": {
             "latest_pow_time": 0

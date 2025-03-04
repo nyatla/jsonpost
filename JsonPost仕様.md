@@ -79,13 +79,12 @@ PowStamp-1: 0102.....
 
 
 
-# 署名形式
-
-
 
 
 # データベース
 
+
+Sqlite3の場合、JSONはString,UUID、HASH、PUBKEYはBLOB
 
 ## システムテーブル
 システムテーブルとして、Nyatla.jpDB管理テーブル標準規格2024のテーブルがあります。
@@ -93,6 +92,10 @@ PowStamp-1: 0102.....
 ### properties
 
 以下の値を格納します。
+- version
+
+キャッシュ値として以下の値を格納します。
+
 - god hexxst 管理者publicキー
 - powalgorithm powアルゴリズムの種類.指定可能値は後述
 
@@ -113,18 +116,6 @@ TimeLogiticsSizeNormalsOr(eh,s,s_sigma)
 ##　アプリケーションテーブル
 
 
-
-ユーザーテーブルとして、以下のテーブルを定義します。
-
-- account_root
-  ユーザーの識別情報、状態管理テーブルです。
-- json_storage
-  JSONデータを格納します。
-- json_history
-
-
-
-
 ### account_root
 ```
 CREATE TABLE account_root (
@@ -138,21 +129,124 @@ CREATE TABLE account_root (
 このテーブルはecdasパブリックキーとnonce値を書き込みます。nonceは新たなリクエストが成功する度にインクリメントします。
 pubkey,uuidは永続データです。
 
-ユーザーの識別にはuuidを使用します。が、そのuuidを識別するためには署名のリカバリキーの候補とpubkeyで識別します。
+
+### history
+Powの必要な操作を記録するテーブルです。
+```
+CREATE TABLE history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,   -- [RO]実行日時（UNIXタイムスタンプを想定）
+    id_account INTEGER NOT NULL,  -- [RO]操作を行ったアカウント
+    pow_score INTEGER NOT NULL,   -- [RO]登録時に使用したPowScoreの値
+    pow_required INTEGER NOT NULL,-- [RO]登録時に要求されていたPowScoreの値
+);
+```
+検討事項
+pow_paramsについては付帯情報としてpow_params_historyに分離する。
+    pow_params JSON NOT NULL      -- [RO]Powの計算に用いられたパラメータ
+
+
+### json_storage_history
+Powテーブルのうち、json_storageに関する付帯情報を記録します。このテーブルの情報はhistory_idに結び付けられます。
+```
+CREATE TABLE json_storage_history (
+    history_id INTEGER PRIMARY KEY, -- [OID]
+    uuid BLOB NOT NULL,    -- [RO]システム内の文章識別ID
+    id_json_storage INTEGER NOT NULL --[RO] 格納されている文章          
+);
+```
+
+### operation_history
+Powテーブルのうち、操作に関する付帯情報を記録します。このテーブルの情報はhistory_idに結び付けられます。
+
+```
+CREATE TABLE operation_history (
+    history_id INTEGER PRIMARY KEY,
+    method TEXT NOT NULL, -- [RO]操作の内容
+    params JSON  -- [RO]操作パラメータ
+);
+```
+set.god
+set.pow_algolism
+set.server_name
+
+
+
+**opjson**
+このフィールドにはシステムの操作内容をJSON形式で格納します。
+格納可能なJSON形式は以下の通りです。
+
+
+- powアルゴリズム/パラメータを変更します。
+  ```[setpow,["algolithm",[p1,p2,p3]]]```
+- nonceを変更します。
+  未定
+- サーバー名を変更します。
+  未定
 
 
 
 ### json_storage
-
+JSONを格納するテーブルです。
 ```
 CREATE TABLE json_storage (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
-    uuid BLOB NOT NULL,                -- [RO]システム内の文章識別ID
-    hash BLOB NOT NULL,                -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
-    json JSON NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
+    hash BLOB NOT NULL UNIQUE,         -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
+    json JSON NOT NULL                 -- [RO]実際のJSONデータ(そのまま保存)
 );
 ```
 
+
+
+# 操作プロセス
+
+## 初期化
+- id=0にGodアカウントを登録。
+- propertyに各種設定(root情報)
+- propertyのGodアカウントを設定
+- (Option)キャッシュ同期処理
+
+## ユーザーアカウントの登録
+- rootでPOWをチェック
+- アカウントを登録
+- rootのtimestampを更新
+
+## 既存ユーザーの特定
+- アカウントを検索
+- historyからtimestamp取得
+
+## JSONの投入
+- キャッシュまたはhistoryからパラメータを取得
+- accountを特定
+- json_storageにJSONを投入。
+- historyにログを投入。
+- json_storage_historyにバインド情報を投入。
+- accountのtimestampを更新
+
+
+
+
+
+
+
+
+
+## 難易度定数の変更
+- accountを特定
+- historyにログを投入
+- operation_historyにバインド情報を投入
+- キャッシュに反映
+
+
+
+
+
+
+
+
+
+
+```
 このテーブルはアカウントが投入したJSONを蓄積します。同一文章は格納できません。
 
 
@@ -171,12 +265,14 @@ CREATE TABLE json_storage (
 ### json_storage_history
 ```
 CREATE TABLE json_storage_history (
-    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_date INTEGER NOT NULL,     -- [RO]データの投入時刻（UNIXタイムスタンプを想定）
     id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
-    id_json_storage INTEGER NOT NULL,   -- [RO]文章のID
+    id_json_storage INTEGER NOT NULL,  -- [RO]文章のID
     opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
-    pownonce INTEGER NOT NULL --[RO]登録時のPOW-NONCE数
+    pownonce INTEGER NOT NULL, --[RO]登録時に使用したPowNonce
+    powparams JSON NOT NULL, -- [RO] 登録時に使用したpowrateのパラメータ [name,rate...]
+    pownonce_required INTEGER NOT NULL, --[RO]登録時に必要だったPowNonce
 );
 ```
 このテーブルはアカウントが投入したJSONとアカウントのIDペア、その投入を記録します。

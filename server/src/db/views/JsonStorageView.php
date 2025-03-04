@@ -4,6 +4,7 @@ namespace Jsonpost\db\views;
 use Jsonpost\utils\UuidWrapper;
 use \PDO as PDO;
 use Exception;
+
 class JsonStorageView
 {
     public const VERSION = 'JsonStorageView:1';

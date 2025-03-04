@@ -12,21 +12,20 @@ require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインス
 // use JsonPost;
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
-use Jsonpost\endpoint\{StampRequiredEndpoint};
-use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage};
+use Jsonpost\endpoint\{Jsonpost\endpoint\PoWAccountRequiredEndpoint};
+use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,History};
+
 
 
 
 
 
 // アップロードAPIの処理
-function apiMain($db,$rawData):IResponseBuilder
+function konnichiwa($db,$rawData):IResponseBuilder
 {
 
-    $endpoint=new StampRequiredEndpoint($db,$rawData);
+    $endpoint=new PoWAccountRequiredEndpoint($db,$rawData);
     $ps=$endpoint->stamp;
-
-
     
     //ここから書込み系の
     $ar_rec=$endpoint->account;
@@ -35,25 +34,31 @@ function apiMain($db,$rawData):IResponseBuilder
     $current_score=$ps->getPowScore32();
 
     #文章を登録
-    $js_tbl=new JsonStorage($db);
     $request = json_decode($rawData, true);
     if ($request === null) {
         ErrorResponseBuilder::throwResponse(301,'Invalid JSON format.');
     }    
+    //アップデートのバッチ処理
+    $js_tbl=new JsonStorage($db);
+    $hs_tbl=new History($db);
+    $jsh_table=new JsonStorageHistory($db);
+
     $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($request,JSON_UNESCAPED_UNICODE));
-    $uh_tbl=new JsonStorageHistory($db);
-    $uh_tbl->insert($endpoint->accepted_time,$ar_rec->id,$js_rec->id,0,$current_score,$endpoint->required_pow);
+    $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->getPowScore32(),$endpoint->required_pow);
+    $jsh_rec=$jsh_table->insert($hs_rec->id,$js_rec->id);    
+    //アップデートのバッチ処理/
+
 
     $endpoint->commitStamp();
     return new SuccessResultResponseBuilder(
         [
         'document'=>[
             'status'=>$js_rec->is_new_record?'new':'copy',
-            'json_uuid'=>$ar_rec->uuidAsText(),
+            'json_uuid'=>$jsh_rec->uuidAsText(),
         ],
         'account'=>[
             'status'=>$ar_rec->is_new_record?'new':'exist',
-            'user_uuid'=>$js_rec->uuidAsText(),
+            'user_uuid'=>$ar_rec->uuidAsText(),
             'nonce'=>$ps->getNonceAsInt(),    
         ],
         'pow'=>[
@@ -82,17 +87,20 @@ try{
     }
 
     // アップロードAPI処理を呼び出す
-    apiMain($db, $rawData)->sendResponse();
+    konnichiwa($db, $rawData)->sendResponse();
     $db->exec("COMMIT");
-}catch(ErrorResponseBuilder $exception){
+}catch(ErrorResponseBuilder $e){
     $db->exec("ROLLBACK");
-    $exception->sendResponse();
+    $e->sendResponse();
+    throw $e;
 }catch(Exception $e){
     $db->exec("ROLLBACK");
     ErrorResponseBuilder::catchException($e)->sendResponse();
+    throw $e;
 }catch(Error $e){
     $db->exec("ROLLBACK");
     ErrorResponseBuilder::catchException($e)->sendResponse();
+    throw $e;
 }
 
 

@@ -10,16 +10,12 @@ use \Jsonpost\responsebuilder\ErrorResponseBuilder;
 
 class JsonStorageRecord {
 
-    public ?int $id = null;    
-    public string $uuid;
+    public int $id;    
     public string $hash;
     public string $json;
     public readonly int $is_new_record;
     public function __construct($is_new_record){
         $this->is_new_record = $is_new_record;
-    }
-    public function uuidAsText(): string{
-        return UuidWrapper::loadFromBytes($this->uuid);
     }
 
 }
@@ -38,16 +34,16 @@ class JsonStorage
 
 
     // テーブル作成
-    public function createTable()
+    public function createTable():JsonStorage
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS $this->name (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            uuid BLOB NOT NULL UNIQUE,         -- [RO]システム内の文章識別ID
             hash BLOB NOT NULL UNIQUE,         -- [RO]識別子/文章ハッシュ jsonの内容から作成したsha256
-            json JSON NOT NULL                 -- [RO]実際のJSONデータ（そのまま保存）
+            json JSON NOT NULL                 -- [RO]実際のJSONデータ(そのまま保存)
         )";
         $this->db->exec($sql);
+        return $this;
     }
 
     // jsonDataのSHA-256ハッシュを取り、そのハッシュを使ってUUID5を生成（URL名前空間使用）
@@ -56,13 +52,10 @@ class JsonStorage
         // jsonDataのSHA-256ハッシュを計算
         $hash = hex2bin(hash('sha256', $jsonData)); // JSONデータのSHA-256ハッシュ
 
-        // UUID v5を生成（URLの名前空間UUIDとjsonDataのSHA-256ハッシュを基に）
-        $uuid = UuidWrapper::create7(); // 名前空間をURLとしてUUID v5を生成
-
         // まず既存のレコードを検索
         $sql = "SELECT * FROM $this->name WHERE hash = :hash";
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':hash', $hash);
+        $stmt->bindParam(':hash', $hash, PDO::PARAM_STR);
         $stmt->execute();
         $record = $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[false]);
 
@@ -72,12 +65,10 @@ class JsonStorage
         } else {
             // レコードが存在しなければ挿入
             $sqlInsert = "
-            INSERT INTO $this->name (uuid, hash, json)
-            VALUES (:uuid, :hash, json(:json))
+            INSERT INTO $this->name (hash, json)
+            VALUES (:hash, json(:json))
             ";
             $stmtInsert = $this->db->prepare($sqlInsert);
-            $uuid_v=$uuid->asBytes();
-            $stmtInsert->bindParam(':uuid', $uuid_v);
             $stmtInsert->bindParam(':hash', $hash);
             $stmtInsert->bindParam(':json', $jsonData);
             $stmtInsert->execute();
@@ -94,19 +85,14 @@ class JsonStorage
             return $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[true]);
         }
     }
-    public function selectByUuid(string $uuid): JsonStorageRecord
+    public function selectById(int $id): JsonStorageRecord
     {
-        // 最初に、uuidが一致するレコードのindexを取得する
-        $indexSql = "
-        SELECT *
-        FROM $this->name
-        WHERE hex(uuid) == :uuid;
-        ";
+        // 最初に、idが一致するレコードのindexを取得する
+        $indexSql = "SELECT * FROM $this->name WHERE id == :id;";
         // echo(strtoupper(bin2hex($uuid)));        
         // $this->db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         $stmt = $this->db->prepare($indexSql);
-        $t=strtoupper(bin2hex($uuid));
-        $stmt->bindValue(':uuid', $t, PDO::PARAM_STR);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         // $stmt->debugDumpParams();
         $stmt->execute();
 
@@ -114,7 +100,7 @@ class JsonStorage
         $result = $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[false]);
 
         // レコードが存在しない場合は例外をスロー
-        if (!$result) {
+        if ($result===false) {
             ErrorResponseBuilder::throwResponse(401);
         }
         return $result;

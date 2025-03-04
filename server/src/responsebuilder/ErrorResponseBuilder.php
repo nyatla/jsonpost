@@ -22,6 +22,7 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
         203=>'ECDSA signature is incorrect.',
         204=>'Nonce is invalid.',
         205=>'PoW calculation value is below the required threshold.',
+        206=>'You are not god.',
     
         301=>'Request body format is invalid (cannot be read or is missing).',
         302=>'Request body is missing required values (insufficient content).',

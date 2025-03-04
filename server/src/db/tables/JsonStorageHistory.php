@@ -3,18 +3,19 @@ namespace Jsonpost\db\tables;
 
 
 use \PDO as PDO;
+use \Exception as Exception;
+use \Jsonpost\utils\UuidWrapper;
 
 
-class JsonStorageHistoryRow{
-    public ?int $id;
-    public int $created_date;
-    public int $id_account;
+class JsonStorageHistoryRecord{
+    public int $history_id;
+    public string $uuid;
     public int $id_json_storage;
-    public int $opcode;
-    public int $pownonce;
-    public int $pownonce_required;
     // カラム名とプロパティ名が一致している必要があります
     // 名前が異なる場合は、SQL側でエイリアスを使用するか、__set()マジックメソッドで対応します
+    public function uuidAsText(): string{
+        return UuidWrapper::loadFromBytes($this->uuid);
+    }
 }
 
 class JsonStorageHistory
@@ -29,41 +30,17 @@ class JsonStorageHistory
         $this->db = $db;
     }
 // テーブルを作成する
-    public function createTable()
+    public function createTable():JsonStorageHistory
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS $this->name (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            created_date INTEGER NOT NULL,     -- [RO]データの投入時刻（UNIXタイムスタンプを想定）
-            id_account INTEGER NOT NULL,       -- [RO]文章を所有するアカウントID
-            id_json_storage INTEGER NOT NULL,  -- [RO]文章のID
-            opcode INTEGER NOT NULL,   -- [RO]操作コード(0)
-            pownonce INTEGER NOT NULL, --[RO]登録時に使用したPowNonce
-            pownonce_required INTEGER NOT NULL --[RO]登録時に必要だったPowNonce
-        );
-        ";
+            history_id INTEGER PRIMARY KEY,
+            uuid BLOB NOT NULL,    -- [RO]システム内の文章識別ID
+            id_json_storage INTEGER NOT NULL  -- [RO]文章のID
+            );";
 
         $this->db->exec($sql);
-    }
-    /**
-     * アカウントIDについて、最終更新レコードを得る。
-     * @param int $id_account
-     * @return null or
-     */
-    public function selectLatestByAccount(int $id_account):JsonStorageHistoryRow
-    {
-        // SQLクエリ
-        $sql = "
-            SELECT * FROM {$this->name} 
-            WHERE id_account = :id_account 
-            ORDER BY created_date DESC 
-            LIMIT 1
-        ";
-        // クエリの実行
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':id_account', $id_account, PDO::PARAM_INT);
-        $stmt->execute();
-        return  $stmt->fetchObject('Jsonpost\db\tables\JsonStorageHistoryRow');
+        return $this;
     }
 
     /**
@@ -74,23 +51,35 @@ class JsonStorageHistory
      * @param int $pownonce
      * @return void
      */
-    public function insert(int $createdDate,int $idAccount, int $idJsonStorage,int $opCode,int $pownonce,int $pownonce_required)
+    public function insert(int $history_id, int $id_json_storage):JsonStorageHistoryRecord
     {
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (created_date, id_account, id_json_storage,opcode,pownonce,pownonce_required)
-        VALUES (:created_date, :id_account, :id_json_storage,:opcode,:pownonce,:pownonce_required);
+        INSERT INTO $this->name (history_id, uuid, id_json_storage)
+        VALUES (:history_id, :uuid, :id_json_storage);
         ";
-
+        $uuid = UuidWrapper::create7();
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':created_date', $createdDate);
-        $stmt->bindParam(':id_account', $idAccount);
-        $stmt->bindParam(':id_json_storage', $idJsonStorage);
-        $stmt->bindParam(':opcode', $opCode);
-        $stmt->bindParam(':pownonce', $pownonce);
-        $stmt->bindParam(':pownonce_required', $pownonce_required);
-
+        $stmt->bindParam(':history_id', $history_id, PDO::PARAM_INT);
+        $stmt->bindParam(':uuid', $uuid, PDO::PARAM_LOB);
+        $stmt->bindParam(':id_json_storage', $id_json_storage, PDO::PARAM_INT);
         $stmt->execute();
+        // 挿入したレコードのIDを取得
+        $insertedId = $this->db->lastInsertId();
+
+        // 新しく挿入したレコードを取得（IDを使って取得）
+        $sql = "SELECT * FROM $this->name WHERE history_id = ? LIMIT 1;";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$insertedId]);
+
+        $value=$stmt->fetchObject('Jsonpost\db\tables\JsonStorageHistoryRecord');        
+        if ($value === false) {
+            throw new Exception('Insert failed.');
+        }
+        // 文字列をjson_decodeして返す
+        return $value;
+        
+
     }
 }

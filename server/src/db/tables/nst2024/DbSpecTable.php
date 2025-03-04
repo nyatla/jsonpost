@@ -13,7 +13,7 @@ class DbSpecTable
         $this->db = $db;
     }
 
-    public function createTable()
+    public function createTable():DbSpecTable
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS dbspec (
@@ -24,6 +24,7 @@ class DbSpecTable
         );
         ";
         $this->db->exec($sql);
+        return $this;
     }
 
     public function insert($version, $tablename, $params = '')

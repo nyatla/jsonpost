@@ -22,10 +22,10 @@ PowStamp-1: <hex値>
 Content-Type: application/json
 
 {
-    "version": "urn::nyatla.jp:json-request::ecdas-signed-konnichiwa:1",
-    "params": {
-        "server_name": null,
-        "pow_algorithm": "tnsln(5,16,0.8)"
+    "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
+    "params":{
+        "pow_algorithm":["tlsln",[10,16,0.8]],
+        "server_name":null
     }
 }
 ```
@@ -54,7 +54,7 @@ Content-Type: application/json
     "result": {
         "god": "02cf751b15ce7de09d29aa612a48788b7ce576ba513a50c666404131d2988f5718",
         "server_name": null,
-        "pow_algorithm": "tlsln(5,16,0.8)"
+        "pow_algorithm": ["tlsln",[5,16,0.8]]
     }
 }
 ```

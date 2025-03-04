@@ -3,6 +3,8 @@
 */
 namespace Jsonpost\db\tables\nst2024;
 
+use Jsonpost\utils\pow\ITimeSizeDifficultyProvider;
+use Jsonpost\utils\pow\TimeSizeDifficultyBuilder;
 use PDO;
 use Exception;
 use \Jsonpost\responsebuilder\ErrorResponseBuilder;
@@ -10,7 +12,11 @@ use \Jsonpost\responsebuilder\ErrorResponseBuilder;
 class PropertiesRows {
     public string $version;
     public string $god;
-    public string $pow_algorithm;
+    /**
+     * jsonオブジェクト
+     * @var object
+     */
+    public ITimeSizeDifficultyProvider $pow_algorithm;
     public ?string $server_name;
     public int $root_pow_accept_time;
 
@@ -22,7 +28,7 @@ class PropertiesRows {
 
         $this->version = $a[PropertiesTable::VNAME_VERSION];
         $this->god = $a[PropertiesTable::VNAME_GOD];
-        $this->pow_algorithm = $a[PropertiesTable::VNAME_POW_ALGORITHM];
+        $this->pow_algorithm =TimeSizeDifficultyBuilder::fromText($a[PropertiesTable::VNAME_POW_ALGORITHM]);
         $this->server_name = $a[PropertiesTable::VNAME_SERVER_NAME];
         $this->root_pow_accept_time =  (int)$a[PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME];
     }
@@ -46,26 +52,34 @@ class PropertiesTable
         $this->name= $name;
     }
 
-    public function createTable()
+    public function createTable():PropertiesTable
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS {$this->name} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            name TEXT UNIQUE NOT NULL,
             value TEXT
         );
         ";
         $this->db->exec($sql);
+        return $this;
     }
-
-    public function insert($name, $value)
+    public function upsert(string $name, ?string $value)
     {
-        $sql = "INSERT INTO {$this->name} (name, value) VALUES (:name, :value)";
+        $sql = "
+            INSERT OR REPLACE INTO {$this->name} (name, value)
+            VALUES (:name, :value);
+        ";
+    
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':name', $name, PDO::PARAM_STR);
         $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-        $stmt->execute();
+    
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to upsert param '{$name}'");
+        }
     }
+
     public function selectByName(string $name): ?string
     {
         // 最初に、uuidが一致するレコードのindexを取得する
@@ -105,19 +119,6 @@ class PropertiesTable
     }
 
     
-    public function updateParam(string $name, string $value)
-    {
-        // SQLクエリを準備
-        $sql = "UPDATE {$this->name} SET value = :value WHERE name = :name";
-        
-        // プリペアドステートメントの準備
-        $stmt = $this->db->prepare($sql);
-        
-        // バインドする値をセット
-        $stmt->bindValue(':name', $name, PDO::PARAM_STR);
-        $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-        
-        // クエリを実行
-        $stmt->execute();        
-    }
+    
+    
 }

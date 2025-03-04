@@ -20,7 +20,7 @@ use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
 
 
 use Jsonpost\endpoint\{
-    RawStampRequiredEndpoint
+    Jsonpost\endpoint\StampRequiredEndpoint
 };
 
 
@@ -35,7 +35,7 @@ try{
     $account_block=null;
     if(isset($_SERVER['HTTP_POWSTAMP_1'])){
         //スタンプがついてたらaccountの情報も取る
-        $endpoint=new RawStampRequiredEndpoint(server_name: $properties->server_name,rawData: null);
+        $endpoint=new StampRequiredEndpoint(server_name: $properties->server_name,rawData: null);
         #ここに段階右折してるから後で直して
         $act=new EcdasSignedAccountRoot($db);
         $act_rec=$act->selectAccountByPubkey($endpoint->stamp->getEcdsaPubkey());
