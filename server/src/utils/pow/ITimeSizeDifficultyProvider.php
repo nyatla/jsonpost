@@ -5,7 +5,7 @@ require dirname(__FILE__) .'/rateprovider.php'; // Composerでインストール
 
 interface ITimeSizeDifficultyProvider{
     public function rate(float $time, float $size): float;
-    public function pack(): array;
+    public function pack(): mixed;
 
 }
 

@@ -1,11 +1,14 @@
 # /heavendoor API仕様
 
 `/heavendoor` は、サーバーの初期化と管理者公開鍵の登録を行うAPIです。
-このAPIは **1度のみ実行可能** で、成功後は二度と使用できません。
 
 このAPIを利用するには、`PowStamp` ヘッダーが必須です。
 
-## リクエスト仕様
+## /heavendoor?konnichiwa
+
+未初期化状態のサーバーを初期化して、データベースを構築します。
+このAPIは **1度のみ実行可能** で、成功後は二度と使用できません。
+
 
 ### 必要なPowStamp
 このAPIは、[`PowStamp`](../../powstamp.md) の付与が必須です。
@@ -44,9 +47,9 @@ Content-Type: application/json
 
 ---
 
-## レスポンス仕様
+### レスポンス仕様
 
-### 成功時
+#### 成功時
 
 ```json
 {
@@ -59,7 +62,7 @@ Content-Type: application/json
 }
 ```
 
-### フィールド説明（リスト形式）
+#### フィールド説明（リスト形式）
 
 - **success**  
     処理結果。`true`の場合は成功、`false`の場合は失敗です。
@@ -79,7 +82,55 @@ Content-Type: application/json
 
 ---
 
-### 失敗時
+#### 失敗時
 
 エラーが発生した場合は、[`エラーコード`](./errorcodes.md) を参照してください。
+
+## /heavendoor?setparams
+
+サーバの初期化後にパラメータを変更することができます。
+
+
+### 必要なPowStamp
+このAPIは、GODアドレスの[`PowStamp`](../../powstamp.md) の付与が必須です。
+
+- **nonce**: `0` を指定してください。
+- **payload**: リクエストボディの内容です。
+- **pow**: ハッシングは不要です。
+
+### リクエストフォーマット
+
+```http
+POST /heavendoor.php?setparams HTTP/1.1
+PowStamp-1: <hex値>
+Content-Type: application/json
+
+{
+    "version": "urn::nyatla.jp:json-request::jsonpost-setparams:1",
+    "params":{
+        "pow_algorithm":["tlsln",[10,16,0.8]],
+        "server_name":null
+    }
+}
+```
+
+### パラメータ説明
+
+変更するパラメータのみ指定してください。
+
+- **server_name**  
+    サーバーのドメイン名として登録します。  
+    以降のPowStamp生成時に必要になります。  
+    同名サーバー間では認証情報を共有できます。
+
+- **pow_algorithm**  
+    サーバーが使用するPoW閾値決定アルゴリズムを指定します。`tnsln` のみ指定可能です。  
+    - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
+    - 上記例では、「アップロード間隔5秒」「JSONファイルサイズ16KB」を目標とした設定になっています。
+
+---
+
+### レスポンス仕様
+
+?konnichiwaと同一です。現在の設定値がそのまま帰ります。
 

@@ -117,10 +117,11 @@ class EcdasSignedAccountRoot
     public function selectAccountByUuid($uuid):EcdasSignedAccountRootRecord
     {
         $sql = "
-        SELECT * FROM $this->name WHERE uuid = ?;
+        SELECT * FROM $this->name WHERE uuid = :uuid;
         ";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$uuid]);
+        $stmt->bindParam(':uuid',$uuid, PDO::PARAM_LOB);
+        $stmt->execute();
         $ret=$stmt->fetchObject('Jsonpost\db\tables\EcdasSignedAccountRootRecord',[false]);
         if ($ret === false) {
             ErrorResponseBuilder::throwResponse(401);
@@ -129,9 +130,10 @@ class EcdasSignedAccountRoot
     }
     public function selectAccountByPubkey(string $pubkey):EcdasSignedAccountRootRecord
     {
-        $sql = "SELECT * FROM $this->name WHERE pubkey = ? LIMIT 1;";
+        $sql = "SELECT * FROM $this->name WHERE pubkey = :pubkey LIMIT 1;";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$pubkey]);
+        $stmt->bindParam(':pubkey',$pubkey, PDO::PARAM_LOB);
+        $stmt->execute();
         $ret=$stmt->fetchObject('Jsonpost\db\tables\EcdasSignedAccountRootRecord',[false]);
         // nonce が見つからない場合
         if ($ret === false) {

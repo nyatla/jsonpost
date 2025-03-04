@@ -1,4 +1,5 @@
 <?php
+
 /**
  * POWSTAMPがある場合はaccountの情報も得られる。
  */
@@ -13,15 +14,14 @@ use Jsonpost\Config;
 
 
 
+use Jsonpost\endpoint\AccountEndpoint;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\db\tables\nst2024\{PropertiesTable};
 use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
+use Jsonpost\db\batch\{HistoryBatch};
 
 
 
-use Jsonpost\endpoint\{
-    Jsonpost\endpoint\StampRequiredEndpoint
-};
 
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
@@ -35,23 +35,27 @@ try{
     $account_block=null;
     if(isset($_SERVER['HTTP_POWSTAMP_1'])){
         //スタンプがついてたらaccountの情報も取る
-        $endpoint=new StampRequiredEndpoint(server_name: $properties->server_name,rawData: null);
+        $endpoint=AccountEndpoint::create($db,null);
         #ここに段階右折してるから後で直して
         $act=new EcdasSignedAccountRoot($db);
         $act_rec=$act->selectAccountByPubkey($endpoint->stamp->getEcdsaPubkey());
-        $acth=new JsonStorageHistory($db);
-        $acth_rec=$acth->selectLatestByAccount($act_rec->id);
+        #historyとjsonStorageHistoryをくっつけて
+
+        $hb=new HistoryBatch($db);
+        $hrec=$hb->selectLatestStorageHistoryByAccount($act_rec->id);
+        if($hrec===false){
+            throw new ErrorResponseBuilder(401);
+        }
         $account_block=[
             'uuid'=>$act_rec->uuidAsText(),
-            'latest_pow_time'=>$acth_rec->created_date
+            'latest_pow_time'=>$hrec->timestamp
         ];
     }
-
     $r=[
         'welcome'=>[
             'version'=>$properties->version,
             'server_name'=>$properties->server_name,
-            'pow_algorithm'=>$properties->pow_algorithm,
+            'pow_algorithm'=>$properties->pow_algorithm->pack(),
         ],
         'root'=>[
             'latest_pow_time'=>$properties->root_pow_accept_time,

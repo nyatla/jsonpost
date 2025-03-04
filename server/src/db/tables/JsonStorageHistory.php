@@ -62,7 +62,7 @@ class JsonStorageHistory
         $uuid = UuidWrapper::create7();
         $stmt = $this->db->prepare($sql);
         $stmt->bindParam(':history_id', $history_id, PDO::PARAM_INT);
-        $stmt->bindParam(':uuid', $uuid, PDO::PARAM_LOB);
+        $stmt->bindParam(':uuid', $uuid->asBytes(), PDO::PARAM_LOB);
         $stmt->bindParam(':id_json_storage', $id_json_storage, PDO::PARAM_INT);
         $stmt->execute();
         // 挿入したレコードのIDを取得

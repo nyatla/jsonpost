@@ -12,7 +12,7 @@ require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインス
 // use JsonPost;
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
-use Jsonpost\endpoint\{Jsonpost\endpoint\PoWAccountRequiredEndpoint};
+use Jsonpost\endpoint\{PoWAccountRequiredEndpoint};
 use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,History};
 
 
@@ -24,7 +24,7 @@ use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,History};
 function konnichiwa($db,$rawData):IResponseBuilder
 {
 
-    $endpoint=new PoWAccountRequiredEndpoint($db,$rawData);
+    $endpoint=PoWAccountRequiredEndpoint::create($db,$rawData);
     $ps=$endpoint->stamp;
     
     //ここから書込み系の

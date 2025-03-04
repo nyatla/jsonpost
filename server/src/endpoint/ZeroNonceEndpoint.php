@@ -13,7 +13,7 @@ use Exception;
 use PDO;
 
 /**
- * Nonce=0のみを許容するエンドポイント。
+ * 既に存在するアカウントにバインドしたRawAccount。
  * このエンドポイントは未初期化サーバーが初期化リクエストを受け入れるために存在します。
  */
 class ZeroNonceEndpoint extends AccountBondEndpoint

@@ -1,10 +1,9 @@
 <?php
 namespace Jsonpost\endpoint;
 
-use Jsonpost\db\tables\EcdasSignedAccountRootRecord;
-use Jsonpost\db\tables\JsonStorage;
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
-use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory,HistoryRecord};
+use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory,HistoryRecord,EcdasSignedAccountRootRecord};
+use Jsonpost\db\batch\HistoryBatch;
 
 use Jsonpost\utils\ecdsasigner\PowStamp;
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
@@ -14,51 +13,14 @@ use Exception;
 use PDO;
 
 
-/**
- * Historyと付帯レコードに関する操作バッチ
- */
-class HistoryBatch{
-    private $db;
-    private JsonStorage $json_storage;
-    public function __construct($db){
-        $this->db = $db;
-    }
-    /**
-     * history_.account_id==account_idのレコードの中でjson_storage_history.history_idにhistory_idがあるものの、history_idが最も大きいhistoryレコードを得る。
-     * storage操作を行った最終レコードを得るために使う
-     */
-    public function selectLatestStorageHistoryByAccount($account_id):HistoryRecord|false
-    {
-        $sql="
-            WITH filtered_history AS (
-                SELECT h.*
-                FROM history h
-                INNER JOIN json_storage_history jsh
-                    ON h.id = jsh.history_id
-            )
-            SELECT *
-            FROM filtered_history
-            WHERE id_account = :account_id
-            ORDER BY id DESC
-            LIMIT 1;
-        ";
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':account_id', $account_id, PDO::PARAM_INT);
-        $stmt->execute();
-
-        return $stmt->fetchObject('Jsonpost\db\tables\HistoryRecord');
-
-        //存在しない場合はnull
-    }
-}
-
 
 
 
 
 
 /**
- * PoWによる認証が行われたアカウント。
+ * PoWによる認証を行うエンドポイント。
+ * このアカウントは自動で新規に生成される。
  * 
  */
 class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
@@ -77,7 +39,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         $this->required_pow=$required_pow;
     }
 
-    public static function create(PDO $db,string $rawData):PoWAccountRequiredEndpoint
+    public static function create(PDO $db,string $rawData,bool $createifnotexist=false):PoWAccountRequiredEndpoint
     {   
         // $this->db=$db;
         $pt=new PropertiesTable($db);
@@ -89,7 +51,15 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         $stamp=parent::createStamp($server_name, $rawData);
         $ar_tbl=new EcdasSignedAccountRoot($db);
 
-        $ar_ret=$ar_tbl->selectOrInsertIfNotExist($stamp->getEcdsaPubkey());
+        $ar_ret=false;
+        if($createifnotexist){
+            $ar_ret=$ar_tbl->selectOrInsertIfNotExist($stamp->getEcdsaPubkey());
+        }else{
+            $ar_ret=$ar_tbl->select($stamp->getEcdsaPubkey());
+            if($ar_ret===false){
+                ErrorResponseBuilder::throwResponse(401);
+            }
+        }
 
         //nonce順位の確認。初めての場合はnonce=0スタート
         if($ar_ret->nonce>=$stamp->getNonceAsInt()){
@@ -111,7 +81,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
             //既存アカウント
             $hb=new HistoryBatch($db);
             $latest_rec=$hb->selectLatestStorageHistoryByAccount($ar_ret->id);
-            $last_time=$latest_rec?$latest_rec->timestapm:0;//0、ありえないのでは？DB削除しない限り
+            $last_time=$latest_rec?$latest_rec->timestamp:0;//0、ありえないのでは？DB削除しない限り
             $ep=$accepted_time-$last_time;
             //ms->sec,byte->kb換算する
             $rate=$tsdb->rate($ep/1000,$json_size/1000);

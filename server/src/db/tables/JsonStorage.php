@@ -69,7 +69,7 @@ class JsonStorage
             VALUES (:hash, json(:json))
             ";
             $stmtInsert = $this->db->prepare($sqlInsert);
-            $stmtInsert->bindParam(':hash', $hash);
+            $stmtInsert->bindParam(':hash', $hash, PDO::PARAM_LOB);
             $stmtInsert->bindParam(':json', $jsonData);
             $stmtInsert->execute();
 

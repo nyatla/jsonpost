@@ -27,7 +27,7 @@ class TimeLogiticsSizeLnDifficulty implements ITimeSizeDifficultyProvider{
         return $this->g->rate($size) * $this->l->rate($time);
     }
 
-    public function pack(): array {
+    public function pack(): mixed {
         return [TimeLogiticsSizeLnDifficulty::NAME,$this->_params];
     }
 }

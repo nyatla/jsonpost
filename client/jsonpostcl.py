@@ -4,6 +4,7 @@ import argparse
 import requests
 import json
 import struct
+import math
 import datetime
 from dataclasses import dataclass, field
 from typing import ClassVar,Optional,List
@@ -58,14 +59,14 @@ class JsonpostCl:
         VERSION: ClassVar[str] = "nyatla.jp:jsonpostcl:config:1"  # ClassVarで固定値
         created_date: datetime.datetime
         private_key: bytes
-        params_pow_bits:int
+        params_pow_target:int
 
         @classmethod
         def create(cls) -> "JsonpostCl.AppConfig":
             """AppConfigを生成し、設定ファイルに保存"""
             # 署名鍵の生成（rawエンコード、通常は 32 バイトの固定長）
             private_key = EcdsaSignner.generateKey()
-            return cls(created_date=datetime.datetime.now(datetime.timezone.utc),private_key=private_key,params_pow_bits=0)
+            return cls(created_date=datetime.datetime.now(datetime.timezone.utc),private_key=private_key,params_pow_target=0x0fffffff)
 
         @classmethod
         def load(cls, config_file: str) -> "JsonpostCl.AppConfig":
@@ -76,7 +77,7 @@ class JsonpostCl:
                 return cls(
                     created_date=datetime.datetime.strptime(config['created_at'], '%Y-%m-%dT%H:%M:%S%z'),  # タイムゾーン情報を含む
                     private_key=bytes.fromhex(config['private_key']),
-                    params_pow_bits=config['params']['default_powbits']
+                    params_pow_target=config['params']['default_pow_target']
                 )
 
         def save(self, fname: str):
@@ -86,7 +87,7 @@ class JsonpostCl:
                 "private_key": self.private_key.hex(),
                 "created_at": self.created_date.strftime('%Y-%m-%dT%H:%M:%S%z'),  # タイムゾーン付きで保存
                 "params":{
-                    "default_powbits":self.params_pow_bits
+                    "default_pow_target":self.params_pow_target
                 },
             }
             with open(fname, 'w') as f:
@@ -165,20 +166,24 @@ class JsonpostCl:
             d_json=json.dumps(json_obj, ensure_ascii=False).encode('utf-8')
 
 
-            powbitstarget=config.params_pow_bits if self.args.powbits==0 else self.args.powbits
-            print(f"Target Pow bits:{powbitstarget}")
+            powtarget=config.params_pow_target if self.args.powtarget==0 else self.args.powtarget
+            print(f"Target Pow score:{powtarget}")
             print(f"Start hashing!")
             espow:PowStamp=None
             with PerformanceTimer() as pf:
+
+                #ここはｶｯｺｲｲHasherにしたい。
+
                 # ハッシュ処理
-                espow = config.generatePoWStamp(self.args.nonce,self.args.server_name ,d_json,powbitstarget)            
+                espow = config.generatePoWStamp(self.args.nonce,self.args.server_name ,d_json,powtarget)            
                 pownonce = espow.powNonceAsInt  # ハッシュ値（または結果）
                 elapsed_time=pf.elapseInMs
                 # ハッシュレートを計算 (ハッシュ数/秒)
                 hash_rate = pownonce / elapsed_time if elapsed_time > 0 else 0
                 # 結果をプリント
                 # print(espow.powbits,espow.sha256d.hex())
-                print(f"accepted: {espow.score}/{pownonce} ({espow.score*100/powbitstarget:.2f}%) {round(hash_rate)}hash/s (yay!!!)")
+                
+                print(f"accepted: {espow.powScore32}/{pownonce} ({espow.powScore32*100/(32-math.log2(powtarget)):.2f}%) {round(hash_rate)}hash/s (yay!!!)")
 
 
             # verbose が指定された場合、送信する JSON データを表示
@@ -221,7 +226,7 @@ class JsonpostCl:
             upload_parser.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
             upload_parser.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
             upload_parser.add_argument("--nonce", type=int, required=False, default=None, help="The nonce for the upload")
-            upload_parser.add_argument("--powbits", type=int, required=False, default=0, help="Number of PoW bits required for verification.")
+            upload_parser.add_argument("-P","--powtarget", type=int, required=False, default=0x0fffffff, help="Target PoW score.")
             upload_parser.add_argument("--verbose", action="store_true", help="Display the JSON data being uploaded.")
         
             upload_parser.set_defaults(func=JsonpostCl.UploadCommand)
@@ -242,7 +247,7 @@ class JsonpostCl:
             }
             d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
             #スタンプの生成
-            ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0)
+            ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0xffffffff)
             # ヘッダーの指定（charset=utf-8を指定）
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
@@ -290,7 +295,7 @@ class JsonpostCl:
             }
             d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
             #スタンプの生成
-            ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0)
+            ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0xffffffff)
             # ヘッダーの指定（charset=utf-8を指定）
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
@@ -327,7 +332,7 @@ class JsonpostCl:
             response=None
             if self.args.account:
                 config = JsonpostCl.AppConfig.load(self.args.config)
-                powstamp=config.generatePoWStamp(299,self.args.server_name,None,0)
+                powstamp=config.generatePoWStamp(299,self.args.server_name,None,0xffffffff)
                 headers = {
                     "PowStamp-1":powstamp.stamp.hex(),
                 }

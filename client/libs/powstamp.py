@@ -86,19 +86,22 @@ class PowStamp:
         return hashlib.sha256(hashlib.sha256(self.stamp).digest()).digest()
 
 
+    # @property
+    # def score(self):
+    #     """ stampのbytesの先頭からの0ビットの数を数える
+    #     """
+    #     h=self.hash
+    #     bit_count = 0
+    #     for b in h:
+    #         if b == 0:
+    #             bit_count += 8
+    #         else:
+    #             bit_count += (8 - b.bit_length())
+    #             break
+    #     return bit_count
     @property
-    def score(self):
-        """ stampのbytesの先頭からの0ビットの数を数える
-        """
-        h=self.hash
-        bit_count = 0
-        for b in h:
-            if b == 0:
-                bit_count += 8
-            else:
-                bit_count += (8 - b.bit_length())
-                break
-        return bit_count
+    def powScore32(self) -> int:
+        return struct.unpack('>I', self.hash[:4])[0]
 
 
     @classmethod
@@ -133,7 +136,7 @@ class PowStampBuilder:
         hash_base=es.sign(sm.message)+spubkey+struct.pack('>I',nonce)
         for i in range(0xffffffff):
             pw=PowStamp(hash_base+struct.pack('>I', i))
-            if pw.score>target_score:
+            if pw.powScore32<=target_score:
                 return pw
         raise ValueError(f"Failed to find a valid PoW nonce for target_score={target_score}")
 
