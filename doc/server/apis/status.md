@@ -21,13 +21,14 @@ GET /status.php
 {
     "success": true,
     "result": {
-        "welcome": {
+        "setting": {
             "version": "nyatla.jp:jsonpost:1",
             "server_name": null,
             "pow":{
                 "algolitm":"tlsln",
                 "params":[5,16,0.8]
-            }
+            },
+            "welcome":true
         },
         "root": {
             "latest_pow_time": 0
@@ -43,9 +44,9 @@ GET /status.php
     処理結果。`true`の場合は成功、`false`の場合は失敗です。
 
 - **result**  
-    取得結果の詳細情報です。
+    結果を格納します。
 
-    - **welcome**  
+    - **setting**  
         サーバーの基本情報を格納します。
         - **version**  
             サーバーのバージョンです。
@@ -53,7 +54,8 @@ GET /status.php
             サーバーの名称です。
         - **pow_algorithm**  
             PowStampの閾値計算に使用するアルゴリズムとパラメータです。
-
+        - **welcome**
+            未認証アカウントを受け付けるかどうかのフラグ
     - **root**  
         アカウント共通の情報を格納します。
         - **latest_pow_time**  

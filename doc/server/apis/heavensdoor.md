@@ -28,7 +28,9 @@ Content-Type: application/json
     "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
     "params":{
         "pow_algorithm":["tlsln",[10,16,0.8]],
-        "server_name":null
+        "server_name":null,
+        "welcome":true,
+        
     }
 }
 ```
@@ -40,10 +42,13 @@ Content-Type: application/json
     以降のPowStamp生成時に必要になります。  
     同名サーバー間では認証情報を共有できます。
 
-- **pow_algorithm**  
+- **pow_algorithm**
     サーバーが使用するPoW閾値決定アルゴリズムを指定します。`tnsln` のみ指定可能です。  
     - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
     - 上記例では、「アップロード間隔5秒」「JSONファイルサイズ16KB」を目標とした設定になっています。
+
+- **welcome**
+    新規アカウントのアップロードと登録を受け付けるかを指定します。
 
 ---
 
@@ -57,7 +62,8 @@ Content-Type: application/json
     "result": {
         "god": "02cf751b15ce7de09d29aa612a48788b7ce576ba513a50c666404131d2988f5718",
         "server_name": null,
-        "pow_algorithm": ["tlsln",[5,16,0.8]]
+        "pow_algorithm": ["tlsln",[5,16,0.8]],
+        "welcome": true
     }
 }
 ```
@@ -72,12 +78,12 @@ Content-Type: application/json
     - **god**  
         登録された管理者の公開鍵です。  
         管理者機能を利用する際に必要です。
-
     - **server_name**  
         登録されたサーバー名です。
-
     - **pow_algorithm**  
         設定されたPoWアルゴリズムです。
+    - **welcome**  
+        新規アカウントが登録可能かのフラグです。
 
 ---
 
@@ -108,7 +114,8 @@ Content-Type: application/json
     "version": "urn::nyatla.jp:json-request::jsonpost-setparams:1",
     "params":{
         "pow_algorithm":["tlsln",[10,16,0.8]],
-        "server_name":null
+        "server_name":null,
+        "welcome":false,
     }
 }
 ```
@@ -127,6 +134,8 @@ Content-Type: application/json
     - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
     - 上記例では、「アップロード間隔5秒」「JSONファイルサイズ16KB」を目標とした設定になっています。
 
+- **welcome**
+    新規アカウントのアップロードと登録を受け付けるかを指定します。
 ---
 
 ### レスポンス仕様

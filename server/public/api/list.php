@@ -27,7 +27,7 @@ function byOffset($db,$offset,$limit,$filter,$value): IResponseBuilder
     $total=$jsh->totalCount();
 
     if($offset>=$total){
-        throw new ErrorResponseBuilder(103, "Index is too large");
+        ErrorResponseBuilder::throwResponse(103, "Index is too large");
     }
     if($limit==-1){
         $limit=$total-$offset;

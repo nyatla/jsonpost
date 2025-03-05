@@ -38,6 +38,7 @@ function konnichiwa($db,$rawData):IResponseBuilder
     if ($request === null) {
         ErrorResponseBuilder::throwResponse(301,'Invalid JSON format.');
     }    
+
     //アップデートのバッチ処理
     $js_tbl=new JsonStorage($db);
     $hs_tbl=new History($db);

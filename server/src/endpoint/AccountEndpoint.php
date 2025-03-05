@@ -15,7 +15,7 @@ use PDO;
 /**
  * 既に存在するアカウントにバインドしたアカウント。
  * Powは不要。
- * デフォルトでは新規にアカウントを作らない。
+ * 新規アカウント生成はしません。
  */
 class AccountEndpoint extends AccountBondEndpoint
 {
@@ -27,7 +27,7 @@ class AccountEndpoint extends AccountBondEndpoint
 
 
     
-    public static function create(PDO $db,?string $rawData,bool $createifnotexist=false):AccountEndpoint
+    public static function create(PDO $db,?string $rawData):AccountEndpoint
     {   
         // $this->db=$db;
         $pt=new PropertiesTable($db);
@@ -39,14 +39,9 @@ class AccountEndpoint extends AccountBondEndpoint
         $stamp=parent::createStamp($server_name, $rawData);
         $ar_tbl=new EcdasSignedAccountRoot($db);
 
-        $ar_ret=false;
-        if($createifnotexist){
-            $ar_ret=$ar_tbl->selectOrInsertIfNotExist($stamp->getEcdsaPubkey());
-        }else{
-            $ar_ret=$ar_tbl->select($stamp->getEcdsaPubkey());
-            if($ar_ret===false){
-                ErrorResponseBuilder::throwResponse(401);
-            }
+        $ar_ret=$ar_tbl->select($stamp->getEcdsaPubkey());
+        if($ar_ret===false){
+            ErrorResponseBuilder::throwResponse(401);
         }
         return new AccountEndpoint($accepted_time,$stamp,$db,$pt,$ar_ret,0xffffffff);
     }

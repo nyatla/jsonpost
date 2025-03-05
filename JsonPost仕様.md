@@ -93,6 +93,8 @@ Sqlite3の場合、JSONはString,UUID、HASH、PUBKEYはBLOB
 
 以下の値を格納します。
 - version
+- welcome
+- root.pow_accept_time
 
 キャッシュ値として以下の値を格納します。
 
@@ -166,9 +168,10 @@ CREATE TABLE operation_history (
     params JSON  -- [RO]操作パラメータ
 );
 ```
-set.god
+//set.god
 set.pow_algolism
 set.server_name
+set.welcome
 
 
 

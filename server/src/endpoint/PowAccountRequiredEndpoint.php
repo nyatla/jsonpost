@@ -1,15 +1,13 @@
 <?php
 namespace Jsonpost\endpoint;
 
-use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
-use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory,HistoryRecord,EcdasSignedAccountRootRecord};
+use Jsonpost\db\tables\nst2024\{PropertiesTable};
+use Jsonpost\db\tables\{EcdasSignedAccountRoot,EcdasSignedAccountRootRecord};
 use Jsonpost\db\batch\HistoryBatch;
 
 use Jsonpost\utils\ecdsasigner\PowStamp;
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
-use Jsonpost\utils\pow\{TimeSizeDifficultyBuilder};
 
-use Exception;
 use PDO;
 
 
@@ -20,7 +18,7 @@ use PDO;
 
 /**
  * PoWによる認証を行うエンドポイント。
- * このアカウントは自動で新規に生成される。
+ * このアカウントは自動で新規に生成されますが、property出禁視されることもあります。
  * 
  */
 class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
@@ -30,6 +28,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
 
     public readonly EcdasSignedAccountRootRecord $account;
     public readonly int $required_pow;
+    public readonly bool $welcome;
 
     private function __construct(int $accepted_time,PowStamp $stamp,PDO $db, PropertiesTable $pt,EcdasSignedAccountRootRecord $account, int $required_pow){
         parent::__construct($accepted_time,$stamp);
@@ -39,25 +38,25 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         $this->required_pow=$required_pow;
     }
 
-    public static function create(PDO $db,string $rawData,bool $createifnotexist=false):PoWAccountRequiredEndpoint
+    public static function create(PDO $db,string $rawData):PoWAccountRequiredEndpoint
     {   
         // $this->db=$db;
         $pt=new PropertiesTable($db);
+        $pt_rec=$pt->selectAllAsObject();
         // parent::__construct($pt->selectByName(PropertiesTable::VNAME_SERVER_NAME), $rawData);
 
         //nonceの確認
-        $server_name=$pt->selectByName(PropertiesTable::VNAME_SERVER_NAME);
         $accepted_time=parent::getMsNow();
-        $stamp=parent::createStamp($server_name, $rawData);
+        $stamp=parent::createStamp($pt_rec->server_name, $rawData);
         $ar_tbl=new EcdasSignedAccountRoot($db);
 
         $ar_ret=false;
-        if($createifnotexist){
+        if($pt_rec->welcome){
             $ar_ret=$ar_tbl->selectOrInsertIfNotExist($stamp->getEcdsaPubkey());
         }else{
             $ar_ret=$ar_tbl->select($stamp->getEcdsaPubkey());
             if($ar_ret===false){
-                ErrorResponseBuilder::throwResponse(401);
+                ErrorResponseBuilder::throwResponse(207);//not wellcomeで見つからない→新規
             }
         }
 
@@ -69,14 +68,13 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         $pow32 = $stamp->getPowScore32();
 
         $json_size=strlen($rawData);
-        $tsdb=TimeSizeDifficultyBuilder::fromText($pt->selectByName(PropertiesTable::VNAME_POW_ALGORITHM));
         $rate=1;
         if($ar_ret->is_new_record){
             //新規に作成されたアカウント
-            $last_time=intval($pt->selectByName(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME));
+            $last_time=$pt_rec->root_pow_accept_time;
             $ep=$accepted_time-$last_time;
             //ms->sec,byte->kb換算する
-            $rate=$tsdb->rate($ep/1000,$json_size/1000);
+            $rate=$pt_rec->pow_algorithm->rate($ep/1000,$json_size/1000);
         }else{
             //既存アカウント
             $hb=new HistoryBatch($db);
@@ -84,7 +82,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
             $last_time=$latest_rec?$latest_rec->timestamp:0;//0、ありえないのでは？DB削除しない限り
             $ep=$accepted_time-$last_time;
             //ms->sec,byte->kb換算する
-            $rate=$tsdb->rate($ep/1000,$json_size/1000);
+            $rate=$pt_rec->pow_algorithm->rate($ep/1000,$json_size/1000);
         }
         $required_pow=(int)(min(0xffffffff,pow(2,32*$rate)));
         if($pow32>$required_pow){

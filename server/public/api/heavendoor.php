@@ -49,13 +49,41 @@ class OperationBatch{
         $this->oph_tbl->insert($tbl_rec->id,$method,$operation);
     }
     public function copyToPropertyTable(PropertiesTable $tbl){
-        $tbl->upsert(PropertiesTable::VNAME_GOD,json_decode($this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_GOD)->operation)[0]);
+        $tbl->upsert(PropertiesTable::VNAME_GOD,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_GOD)->operationAsJson());
         $tbl->upsert(PropertiesTable::VNAME_POW_ALGORITHM,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_POW_ALGORITHM)->operation);
-        $tbl->upsert(PropertiesTable::VNAME_SERVER_NAME,json_decode($this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_SERVER_NAME)->operation)[0]);
+        $tbl->upsert(PropertiesTable::VNAME_SERVER_NAME,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_SERVER_NAME)->operationAsJson());
+        $tbl->upsert(PropertiesTable::VNAME_WELCOME,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_WELCOME)->operationAsJson()?1:0);
     }
 }
 
 
+/**
+ * プロパティ変更後の同期
+ * @param OperationBatch $opb
+ * @param Jsonpost\db\tables\nst2024\PropertiesTable $tbl_properties
+ * @return SuccessResultResponseBuilder
+ */
+function finish(OperationBatch $opb,PropertiesTable $tbl_properties){
+    $opb->copyToPropertyTable($tbl_properties);//操作履歴を反映
+    $latest_property=$tbl_properties->selectAllAsObject();
+    return new SuccessResultResponseBuilder(
+        [
+            PropertiesTable::VNAME_WELCOME=>$latest_property->welcome,
+            PropertiesTable::VNAME_GOD=>$latest_property->god,
+            PropertiesTable::VNAME_SERVER_NAME=>$latest_property->server_name,
+            PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
+        ]
+    );
+}
+
+
+/**
+ * version,params[server_name,pow_algolithm]は必須
+ * params[welcome]はオプション
+ * @param mixed $db
+ * @param string $rawData
+ * @return SuccessResultResponseBuilder
+ */
 function konnichiwa($db,string $rawData): IResponseBuilder
 {
     //JSONペイロードの評価
@@ -74,11 +102,15 @@ function konnichiwa($db,string $rawData): IResponseBuilder
         }
     } 
     $version = $request['version'];
-    $params=$request['params'];
     if($version!="urn::nyatla.jp:json-request::jsonpost-konnichiwa:1"){
         ErrorResponseBuilder::throwResponse(303,"Invalid version.");
     }
-    $server_name=$param[PropertiesTable::VNAME_SERVER_NAME]??null;
+    //パラメタ
+    $params=$request['params'];
+    //サーバー名(null可)
+    $server_name=$params[PropertiesTable::VNAME_SERVER_NAME]??null;
+
+    //pow_algolithm
     $algorithm_name=$params[PropertiesTable::VNAME_POW_ALGORITHM] ??null;
     if(!$algorithm_name){
         ErrorResponseBuilder::throwResponse(302,'Pow algorithm not set.');
@@ -89,6 +121,12 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     }catch(Exception $e){
         ErrorResponseBuilder::throwResponse(303,"Unknown algorihm '$algorithm_name'");
     }
+    //welcome
+    $welcome=$params[PropertiesTable::VNAME_WELCOME]??false;
+    if(!is_bool($welcome)){
+        ErrorResponseBuilder::throwResponse(302,'Welcome must be boolean.');
+    }
+
     // テーブルがすでに存在するかを確認
     $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
     $result = $db->query($checkSql);
@@ -121,28 +159,18 @@ function konnichiwa($db,string $rawData): IResponseBuilder
 
     #操作履歴を追加
     $opb=new OperationBatch($tbl_operation_history,$tbl_history);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_GOD,[$pubkey_hex]);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_SERVER_NAME,[$server_name]);
+    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_GOD,$pubkey_hex);
+    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_SERVER_NAME,$server_name);
     $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
+    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_WELCOME,$welcome);
     // #デバック用
     // $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
 
     
     $tbl_properties->upsert(PropertiesTable::VNAME_VERSION,Config::VERSION);
     $tbl_properties->upsert(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME,0);     //ルートのPOWリクエスト受理時刻
-    $opb->copyToPropertyTable($tbl_properties);//操作履歴を反映
-
-    $latest_property=$tbl_properties->selectAllAsObject();
-
-
-    return new SuccessResultResponseBuilder(
-        [
-            PropertiesTable::VNAME_GOD=>$latest_property->god,
-            PropertiesTable::VNAME_SERVER_NAME=>$latest_property->server_name,
-            PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
-        ]);
+    return finish($opb,$tbl_properties);
 }
-
 
 function setparams($db,string $rawData): IResponseBuilder
 {
@@ -178,26 +206,27 @@ function setparams($db,string $rawData): IResponseBuilder
         try{
             $pow_algorithm=TimeSizeDifficultyBuilder::fromText($algorithm_name);
             $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
-        
+        }catch(ErrorResponseBuilder $e){
+            throw $e;
         }catch(Exception $e){
-            ErrorResponseBuilder::throwResponse(303,"Unknown algorihm '$algorithm_name'");
+            ErrorResponseBuilder::throwResponse(103,"Unknown algorihm '$algorithm_name'");
         }
     }
+    //サーバーの再設定
     if (array_key_exists(PropertiesTable::VNAME_SERVER_NAME, $params)) {
         $server_name = $params[PropertiesTable::VNAME_SERVER_NAME];
-        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_SERVER_NAME, [$server_name]);
+        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_SERVER_NAME, $server_name);
     }
-    
-    $opb->copyToPropertyTable($tbl_properties);//操作履歴を反映
-    $latest_property=$tbl_properties->selectAllAsObject();
- 
+    //Welcomeの再設定
+    if (array_key_exists(PropertiesTable::VNAME_WELCOME, $params)) {
+        $welcome = $params[PropertiesTable::VNAME_WELCOME];
+        if(!is_bool($welcome)){
+            ErrorResponseBuilder::throwResponse(103);
+        }
+        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_WELCOME, $welcome);
+    }
 
-    return new SuccessResultResponseBuilder(
-        [
-            PropertiesTable::VNAME_GOD=>$latest_property->god,
-            PropertiesTable::VNAME_SERVER_NAME=>$latest_property->server_name,
-            PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
-        ]);
+    return finish($opb,$tbl_properties);
 }
 
 

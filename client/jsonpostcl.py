@@ -39,9 +39,14 @@ class PerformanceTimer(object):
         
 
 
+def str_to_bool(value: str) -> bool:
+    value = value.lower()
+    if value in ['yes', 'true', '1']: return True
+    if value in ['no', 'false', '0']: return False
+    raise argparse.ArgumentTypeError(f"Invalid value '{value}', must be one of [yes, true, 1, no, false, 0].")
 
-    
-        
+
+
         
 
 
@@ -242,7 +247,8 @@ class JsonpostCl:
                 "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
                 "params":{
                     "pow_algorithm":self.args.pow_algorithm,
-                    "server_name":self.args.server_name
+                    "server_name":self.args.server_name,
+                    "welcome":self.args.welcome
                 }
             }
             d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
@@ -273,6 +279,7 @@ class JsonpostCl:
             sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
             sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
             sp.add_argument("--pow-algorithm", type=str, required=False, default='["tlsln",[10,16,0.8]]', help="Pow difficulty detection algorithm.")
+            sp.add_argument("--welcome", type=str_to_bool, required=False, default=None, help="Accept new accounts.['true','false','0','1','yes','no']")
             sp.set_defaults(func=JsonpostCl.AdminKonnichiwaCommand)
 
 
@@ -285,9 +292,12 @@ class JsonpostCl:
                 params['pow_algorithm']=self.args.pow_algorithm
             if self.args.new_server_name is not None:
                 params['server_name']=self.args.new_server_name if len(self.args.new_server_name)>0 else None
+            if self.args.welcome is not None:
+                params['welcome']=self.args.welcome
             if len(params)==0:
                 print('No changes detected.')
                 return
+            print(params)
             
             data = {
                 "version": "urn::nyatla.jp:json-request::jsonpost-setparams:1",
@@ -315,6 +325,7 @@ class JsonpostCl:
 
         @classmethod
         def add_arguments(cls, subparsers):
+
             sp=subparsers.add_parser("setparams", help="Initialize server database.")
             # upload コマンドの後に指定されるデータ
             sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
@@ -322,6 +333,7 @@ class JsonpostCl:
             sp.add_argument("-S","--server-name", default=None, type=str, help="Current server domain name. default=None(public)")
             sp.add_argument("--pow-algorithm", type=str, default=None, help="Pow difficulty detection algorithm.('[\"tlsln\",[10,16,0.8]]')")
             sp.add_argument("--new-server-name", type=str, nargs="?", const="", default=None, help="New server domain name.")
+            sp.add_argument("--welcome", type=str_to_bool, required=False, default=None, help="Accept new accounts.['true','false','0','1','yes','no']")
             sp.set_defaults(func=JsonpostCl.AdminSetparamsCommand)
 
 
@@ -377,4 +389,4 @@ class JsonpostCl:
 
 
 if __name__ == "__main__":
-    JsonpostCl.main()
+    JsonpostCl.main(sys.argv[1:])

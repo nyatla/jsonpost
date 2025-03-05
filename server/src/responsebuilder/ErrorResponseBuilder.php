@@ -23,6 +23,7 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
         204=>'Nonce is invalid.',
         205=>'PoW calculation value is below the required threshold.',
         206=>'You are not god.',
+        207=>'Cannot register a new account.',
     
         301=>'Request body format is invalid (cannot be read or is missing).',
         302=>'Request body is missing required values (insufficient content).',

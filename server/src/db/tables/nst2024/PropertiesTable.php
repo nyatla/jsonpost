@@ -12,6 +12,7 @@ use \Jsonpost\responsebuilder\ErrorResponseBuilder;
 class PropertiesRows {
     public string $version;
     public string $god;
+    public bool $welcome;
     /**
      * jsonオブジェクト
      * @var object
@@ -31,6 +32,7 @@ class PropertiesRows {
         $this->pow_algorithm =TimeSizeDifficultyBuilder::fromText($a[PropertiesTable::VNAME_POW_ALGORITHM]);
         $this->server_name = $a[PropertiesTable::VNAME_SERVER_NAME];
         $this->root_pow_accept_time =  (int)$a[PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME];
+        $this->welcome =  ((int)$a[PropertiesTable::VNAME_WELCOME])>0?true:false;
     }
 }
 
@@ -42,6 +44,7 @@ class PropertiesTable
     public const VNAME_ROOT_POW_ACCEPT_TIME='root.pow_accept_time';
     public const VNAME_VERSION='version';
     public const VNAME_GOD='god';
+    public const VNAME_WELCOME='welcome';
     
     private $db;
     private $name;
@@ -78,6 +81,9 @@ class PropertiesTable
         if (!$stmt->execute()) {
             throw new Exception("Failed to upsert param '{$name}'");
         }
+    }
+    public function selectByNameAsBool(string $name): bool{
+        return ((int)$this->selectByName($name))>0?true:false;
     }
 
     public function selectByName(string $name): ?string

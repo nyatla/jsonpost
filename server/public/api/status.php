@@ -44,12 +44,17 @@ try{
         $hb=new HistoryBatch($db);
         $hrec=$hb->selectLatestStorageHistoryByAccount($act_rec->id);
         if($hrec===false){
-            throw new ErrorResponseBuilder(401);
+            //Historyがない
+            $account_block=[
+                'uuid'=>$act_rec->uuidAsText(),
+                'latest_pow_time'=>0
+            ];
+        }else{
+            $account_block=[
+                'uuid'=>$act_rec->uuidAsText(),
+                'latest_pow_time'=>$hrec->timestamp
+            ];    
         }
-        $account_block=[
-            'uuid'=>$act_rec->uuidAsText(),
-            'latest_pow_time'=>$hrec->timestamp
-        ];
     }
     $r=[
         'welcome'=>[

@@ -4,13 +4,13 @@ namespace Jsonpost\db\tables;
 
 use Exception;
 use \PDO as PDO;
-use \Jsonpost\utils\UuidWrapper;
+
 
 
 class OperationHistoryRecord{
     public int $id_history;
     public string $method;
-    public string $operation; //JSON
+    public string $operation; //JSON-string
     public function operationAsJson():mixed {
         return json_decode($this->operation);
     }
@@ -23,6 +23,7 @@ class OperationHistory
     public const METHOD_SET_GOD='set.god';
     public const METHOD_SET_POW_ALGORITHM='set.pow_algorithm';
     public const METHOD_SET_SERVER_NAME='set.server_name';
+    public const METHOD_SET_WELCOME='set.welcome';
     private $db;
     public readonly string $name;
 
@@ -44,26 +45,8 @@ class OperationHistory
         $this->db->exec($sql);
         return $this;
     }
-    // /**
-    //  * アカウントIDについて、最終更新レコードを得る。
-    //  * @param int $id_account
-    //  * @return null or
-    //  */
-    // public function selectLatestByAccount(int $id_account):JsonStorageHistoryRow
-    // {
-    //     // SQLクエリ
-    //     $sql = "
-    //         SELECT * FROM {$this->name} 
-    //         WHERE id_account = :id_account 
-    //         ORDER BY created_date DESC 
-    //         LIMIT 1
-    //     ";
-    //     // クエリの実行
-    //     $stmt = $this->db->prepare($sql);
-    //     $stmt->bindValue(':id_account', $id_account, PDO::PARAM_INT);
-    //     $stmt->execute();
-    //     return  $stmt->fetchObject('Jsonpost\db\tables\JsonStorageHistoryRow');
-    // }
+
+    
 
     public function insert(int $id_history, string $method,mixed $operation): OperationHistoryRecord
     {
