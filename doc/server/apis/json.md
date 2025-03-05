@@ -21,7 +21,7 @@
 ## リクエスト形式
 
 ```http
-GET /json.php?uuid=00000000-0000-0000-0000-000000000000
+GET /json.php?uuid=01956156-6566-702c-9f81-7b05a19f0e89
 ```
 
 ---
@@ -32,11 +32,16 @@ GET /json.php?uuid=00000000-0000-0000-0000-000000000000
 
 ```json
 {
-    "success": true,
-    "result": {
-        "uuid": "00000000-0000-0000-0000-000000000000",
-        "json": [:JSONドキュメント:]
+  "success": true,
+  "result": {
+    "path": "$",
+    "timestamp": 1741094806608,
+    "uuid_account": "01956156-0db1-73ce-83a4-2f2b223848aa",
+    "uuid_document": "01956156-6566-702c-9f81-7b05a19f0e89",
+    "json": {
+      "key2": "aaa0"
     }
+  }
 }
 ```
 

@@ -8,7 +8,7 @@ use \Jsonpost\utils\UuidWrapper;
 
 
 class OperationHistoryRecord{
-    public int $history_id;
+    public int $id_history;
     public string $method;
     public string $operation; //JSON
     public function operationAsJson():mixed {
@@ -36,7 +36,7 @@ class OperationHistory
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS $this->name (
-            history_id INTEGER PRIMARY KEY,
+            id_history INTEGER PRIMARY KEY,
             method TEXT NOT NULL,
             operation JSON
         )";
@@ -65,15 +65,15 @@ class OperationHistory
     //     return  $stmt->fetchObject('Jsonpost\db\tables\JsonStorageHistoryRow');
     // }
 
-    public function insert(int $history_id, string $method,mixed $operation): OperationHistoryRecord
+    public function insert(int $id_history, string $method,mixed $operation): OperationHistoryRecord
     {
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (history_id, method,operation)
-        VALUES (:history_id,:method,json(:operation));";
+        INSERT INTO $this->name (id_history, method,operation)
+        VALUES (:id_history,:method,json(:operation));";
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':history_id', $history_id, PDO::PARAM_INT);
+        $stmt->bindParam(':id_history', $id_history, PDO::PARAM_INT);
         $stmt->bindParam(':method', $method, PDO::PARAM_STR);
         $stmt->bindParam(':operation', json_encode($operation), PDO::PARAM_STR);
         $stmt->execute();
@@ -82,7 +82,7 @@ class OperationHistory
         $insertedId = $this->db->lastInsertId();
 
         // 新しく挿入したレコードを取得（IDを使って取得）
-        $sql = "SELECT * FROM $this->name WHERE history_id = ? LIMIT 1;";
+        $sql = "SELECT * FROM $this->name WHERE id_history = ? LIMIT 1;";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$insertedId]);
         
@@ -98,7 +98,7 @@ class OperationHistory
         SELECT * 
         FROM $this->name
         WHERE method = :method
-        ORDER BY history_id DESC
+        ORDER BY id_history DESC
         LIMIT 1";
 
         $stmt = $this->db->prepare($sql);

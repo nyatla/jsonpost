@@ -55,7 +55,7 @@ class JsonStorage
         // まず既存のレコードを検索
         $sql = "SELECT * FROM $this->name WHERE hash = :hash";
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':hash', $hash, PDO::PARAM_STR);
+        $stmt->bindParam(':hash', $hash, PDO::PARAM_LOB);
         $stmt->execute();
         $record = $stmt->fetchObject('Jsonpost\db\tables\JsonStorageRecord',[false]);
 

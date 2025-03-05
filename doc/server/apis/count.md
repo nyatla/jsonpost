@@ -25,8 +25,12 @@ GET /count.php
 {
     "success": true,
     "result": {
-        "matched": 24,
-        "total": 24
+        "total": 7,
+        "range": {
+            "offset": 3,
+            "limit": 3
+        },
+        "matched":1
     }
 }
 ```
@@ -37,13 +41,13 @@ GET /count.php
     処理結果。`true`の場合は成功、`false`の場合は失敗です。
 
 - **result**  
-    統計情報を格納するオブジェクトです。
-
-    - **matched**  
-        条件に一致したドキュメント数です。
-
+    結果を格納します。
     - **total**  
-        対象範囲内の全ドキュメント数です。
+        レコードの総数です。
+    - **range**
+        探索範囲を示します。
+    - **matched**
+        探索範囲内での一致数を返します。
 
 ---
 

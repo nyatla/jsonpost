@@ -1,4 +1,6 @@
 <?php
+
+
 require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
 use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
@@ -8,18 +10,18 @@ use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
 
 
 // use JsonPost;
+use Jsonpost\db\query\{RawJsonQueryRecord,StorageQueryRecord};
 use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
-use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot};
 use Jsonpost\utils\{UuidWrapper};
-use JsonPath\{JsonPath,JsonPathException};
+use JsonPath\{JsonPath};
 
 /**
  * このAPIはjsonstorageの検索APIです。
  */
 
 class RawJsonResponseBuilder implements IResponseBuilder {
-    private string $json;
+    private mixed $json;
     public function __construct($json) {
         $this->json=$json;
     }
@@ -31,21 +33,42 @@ class RawJsonResponseBuilder implements IResponseBuilder {
     }
 }
 
-function apiIndexMain($db,$uuid,$path,$is_raw): IResponseBuilder
+function byOffset($db,$uuid,$path,$is_raw): IResponseBuilder
 {
-    $v=new JsonStorage($db);
-    $ret=$v->selectByUuid($uuid);
-    $found=json_decode($ret->json,true);
-    if(isset($path)){
-        $jp=new JsonPath();
-        $found=$jp->find($found,$path);    
-    }
+    // $v=new JsonStorage($db);
+    // $ret=$v->selectByUuid($uuid);
+    // $found=json_decode($ret->json,true);
+    // if(isset($path)){
+    //     $jp=new JsonPath();
+    //     $found=$jp->find($found,$path);    
+    // }
 
-    
 
     if(!$is_raw){
-        return new SuccessResultResponseBuilder(['path'=> '$','data'=>$found]);
+        $ret=StorageQueryRecord::query($db,$uuid);
+        $found=json_decode($ret->json,true);
+        if(isset($path)){
+            $jp=new JsonPath();
+            $found=$jp->find($found,$path);    
+        }else{
+            $path='$';
+        }
+        return new SuccessResultResponseBuilder([
+            'path'=> $path,
+            'timestamp'=> $ret->timestamp,
+            'uuid_account'=>$ret->uuidAccountAsText(),
+            'uuid_document'=>$ret->uuidHistoryAsText(),
+            'json'=>$found
+        ]);
     }else{
+        $ret=RawJsonQueryRecord::query($db,$uuid);
+        $found=json_decode($ret->json,true);
+        if(isset($path)){
+            $jp=new JsonPath();
+            $found=$jp->find($found,$path);    
+        }else{
+            $path='$';
+        }
         return new RawJsonResponseBuilder($found);
     }
 }
@@ -62,7 +85,7 @@ try{
     if(!isset($_GET['uuid'])){
         ErrorResponseBuilder::throwResponse(102);
     }
-    $ret=apiIndexMain(
+    $ret=byOffset(
         $db,
         UuidWrapper::text2bin($_GET['uuid']),
         $_GET['path']??null,

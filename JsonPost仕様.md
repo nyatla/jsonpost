@@ -147,21 +147,21 @@ pow_paramsについては付帯情報としてpow_params_historyに分離する�
 
 
 ### json_storage_history
-Powテーブルのうち、json_storageに関する付帯情報を記録します。このテーブルの情報はhistory_idに結び付けられます。
+Powテーブルのうち、json_storageに関する付帯情報を記録します。このテーブルの情報はid_historyに結び付けられます。
 ```
 CREATE TABLE json_storage_history (
-    history_id INTEGER PRIMARY KEY, -- [OID]
+    id_history INTEGER PRIMARY KEY, -- [OID]
     uuid BLOB NOT NULL,    -- [RO]システム内の文章識別ID
     id_json_storage INTEGER NOT NULL --[RO] 格納されている文章          
 );
 ```
 
 ### operation_history
-Powテーブルのうち、操作に関する付帯情報を記録します。このテーブルの情報はhistory_idに結び付けられます。
+Powテーブルのうち、操作に関する付帯情報を記録します。このテーブルの情報はid_historyに結び付けられます。
 
 ```
 CREATE TABLE operation_history (
-    history_id INTEGER PRIMARY KEY,
+    id_history INTEGER PRIMARY KEY,
     method TEXT NOT NULL, -- [RO]操作の内容
     params JSON  -- [RO]操作パラメータ
 );

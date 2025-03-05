@@ -1,48 +1,72 @@
 <?php
+
 require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
 
-use Jsonpost\utils\ecdsasigner\EcdsaSignerLite;
+
 /**
- * 初期状態のデータベースを作成します。１度だけ実行する必要があります。
+ * ドキュメント(storage)の履歴を参照します。
  */
 
 
 // use JsonPost;
 use Jsonpost\Config;
+use Jsonpost\db\tables\JsonStorageHistory;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
-use Jsonpost\db\views\{JsonStorageView};
 use Jsonpost\utils\{UuidWrapper};
+use Jsonpost\db\query\JsonListQueryRecord;
 
 
 
 
-function apiIndexMain($db,$index,$limit,$filter,$value): IResponseBuilder
+function byOffset($db,$offset,$limit,$filter,$value): IResponseBuilder
 {
-    $v=new JsonStorageView($db);
-    $ret=$v->selectByIndexWithFilter($index, $limit,$filter,$value);
-    $nitems=[];
-    foreach($ret['items'] as $i) {
-        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2])];
+    assert($offset>=0);
+    assert($limit>=-1);
+
+    $jsh=new JsonStorageHistory($db);
+    $total=$jsh->totalCount();
+
+    if($offset>=$total){
+        throw new ErrorResponseBuilder(103, "Index is too large");
     }
+    if($limit==-1){
+        $limit=$total-$offset;
+    }else{
+        $limit=min($total-$offset,$limit);
+    }
+    $ret=JsonListQueryRecord::query($db,$offset,$limit,$filter,$value);
+    $nitems=[];
+    foreach($ret as $i) {
+        $nitems[]=[
+            $i->timestamp,
+            $i->uuidHistoryAsText(), //document_uuid
+            $i->uuidAccountAsText(), //user_uuid
+            $i->size,
+            bin2hex($i->hash)];
+    }
+ 
 
     return new SuccessResultResponseBuilder(
-        ['total'=>$ret['total'],'items'=>$nitems]
+        [
+            'total'=>$total,
+            'range'=>[
+                'offset'=>$offset,
+                'limit'=>$limit
+            ],
+            'table'=>[
+                'head'=>['timestamp','uuid_document','uuid_account','size','hash'],
+                'rows'=>$nitems
+            ]
+        ]
     );
 }
 
 
-function apiIndexMain2($db,$uuid,$limit,$filter,$value): IResponseBuilder
+function byUuid($db,$uuid,$limit,$filter,$value): IResponseBuilder
 {
-    //排他キーのチェック
-    $v=new JsonStorageView($db);
-    $ret=$v->selectByUuid($uuid, $limit,$filter,$value);
-    $nitems=[];
-    foreach($ret['items'] as $i) {
-        $nitems[]=[$i[1],UuidWrapper::bin2text($i[2])];
-    }
-    return new SuccessResultResponseBuilder(
-        ['total'=>$ret['total'],'items'=>$nitems]
-    );
+    $jsh=new JsonStorageHistory($db);
+    $offset=$jsh->getUuidOffset(UuidWrapper::text2bin($uuid));
+    return byOffset($db,$offset,$limit,$filter,$value);
 }
 
 
@@ -63,8 +87,8 @@ try{
         $limit=intval($_GET['limit']);
     }
     //排他キーのチェック
-    $index=0;
-    $keys=['index', 'page', 'uuid'];
+    $offset=0;
+    $keys=['offset', 'page', 'uuid'];
     $count = count(array_filter($keys, fn($p) => isset($_GET[$p])));
     if ($count > 1) {
         ErrorResponseBuilder::throwResponse(103,'Please set one of '.implode(',', $keys),400);
@@ -73,17 +97,15 @@ try{
     $value=$_GET['value'] ?? null;
     $ret;
     if($count==0){
-        $ret=apiIndexMain($db,0,$limit,$path,$value);
-    }else if(isset($_GET['index'])){
-        $index=intval($_GET['index']);
-        $ret=apiIndexMain($db,$index,$limit,$path,$value);
+        $ret=byOffset($db,0,100,$path,$value);
+    }else if(isset($_GET['offset'])){
+        $offset=intval($_GET['offset']);
+        $ret=byOffset($db,$offset,$limit,$path,$value);
     }else if(isset($_GET['page'])){
-        $index=intval($_GET['page'])*$limit;
-        $ret=apiIndexMain($db,$index,$limit,$path,$value);
+        $offset=intval($_GET['page'])*$limit;
+        $ret=byOffset($db,$offset,$limit,$path,$value);
     }else if (isset($_GET['uuid'])){
-        $uuid=UuidWrapper::text2bin($_GET['uuid']);
-        $ret=apiIndexMain2($db,$uuid,$limit,$path,$value);
-
+        $ret=byUuid($db,$_GET['uuid'],$limit,$path,$value);
     }
     $ret->sendResponse();
 }catch(ErrorResponseBuilder $e){

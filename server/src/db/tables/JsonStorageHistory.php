@@ -8,7 +8,7 @@ use \Jsonpost\utils\UuidWrapper;
 
 
 class JsonStorageHistoryRecord{
-    public int $history_id;
+    public int $id_history;
     public string $uuid;
     public int $id_json_storage;
     // カラム名とプロパティ名が一致している必要があります
@@ -34,7 +34,7 @@ class JsonStorageHistory
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS $this->name (
-            history_id INTEGER PRIMARY KEY,
+            id_history INTEGER PRIMARY KEY,
             uuid BLOB NOT NULL,    -- [RO]システム内の文章識別ID
             id_json_storage INTEGER NOT NULL  -- [RO]文章のID
             );";
@@ -51,17 +51,17 @@ class JsonStorageHistory
      * @param int $pownonce
      * @return void
      */
-    public function insert(int $history_id, int $id_json_storage):JsonStorageHistoryRecord
+    public function insert(int $id_history, int $id_json_storage):JsonStorageHistoryRecord
     {
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (history_id, uuid, id_json_storage)
-        VALUES (:history_id, :uuid, :id_json_storage);
+        INSERT INTO $this->name (id_history, uuid, id_json_storage)
+        VALUES (:id_history, :uuid, :id_json_storage);
         ";
         $uuid = UuidWrapper::create7();
         $stmt = $this->db->prepare($sql);
-        $stmt->bindParam(':history_id', $history_id, PDO::PARAM_INT);
+        $stmt->bindParam(':id_history', $id_history, PDO::PARAM_INT);
         $stmt->bindParam(':uuid', $uuid->asBytes(), PDO::PARAM_LOB);
         $stmt->bindParam(':id_json_storage', $id_json_storage, PDO::PARAM_INT);
         $stmt->execute();
@@ -69,7 +69,7 @@ class JsonStorageHistory
         $insertedId = $this->db->lastInsertId();
 
         // 新しく挿入したレコードを取得（IDを使って取得）
-        $sql = "SELECT * FROM $this->name WHERE history_id = ? LIMIT 1;";
+        $sql = "SELECT * FROM $this->name WHERE id_history = ? LIMIT 1;";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$insertedId]);
 
@@ -79,7 +79,47 @@ class JsonStorageHistory
         }
         // 文字列をjson_decodeして返す
         return $value;
+    }
+    public function getUuidOffset($uuid): int {
+        // 最初に、UUIDの位置を取得
+        $sql = "
+        SELECT COUNT(*) 
+        FROM $this->name 
+        WHERE id_history < (
+            SELECT id_history 
+            FROM $this->name 
+            WHERE uuid = :uuid
+            LIMIT 1
+        );";
+    
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':uuid', $uuid, PDO::PARAM_LOB);
+        $stmt->execute();
+    
+        // 結果を取得
+        $position = $stmt->fetchColumn();
+    
+        if ($position === false) {
+            throw new Exception("UUID not found.");
+        }
+    
+        // オフセットを返す
+        return (int) $position;
+    }    
+    /**
+     * レコードの総数を返す。
+     * @return int
+     */
+    public function totalCount(): int
+    {
+        // SQLクエリを準備
+        $sql = "SELECT COUNT(*) FROM $this->name;";
         
-
+        // クエリを実行
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        
+        // 結果を取得し、返す
+        return (int) $stmt->fetchColumn();
     }
 }

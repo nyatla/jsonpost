@@ -27,7 +27,7 @@ class HistoryBatch{
                 SELECT h.*
                 FROM history h
                 INNER JOIN json_storage_history jsh
-                    ON h.id = jsh.history_id
+                    ON h.id = jsh.id_history
             )
             SELECT *
             FROM filtered_history
