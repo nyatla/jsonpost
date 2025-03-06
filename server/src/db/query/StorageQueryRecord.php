@@ -39,7 +39,7 @@ class StorageQueryRecord {
                     jr.*,
                     h.id_account,
                     h.timestamp,
-                    h.pow_score,
+                    h.powstamp,
                     h.pow_required                  
                 FROM json_reord jr
                 JOIN history h ON h.id = jr.id_history
@@ -50,7 +50,7 @@ class StorageQueryRecord {
                     a.uuid as uuid_account,
                     hj.uuid_history,
                     hj.timestamp,
-                    hj.pow_score,
+                    hj.powstamp,
                     hj.pow_required           
                 FROM history_joined hj
                 JOIN account_root a ON hj.id_account = a.id

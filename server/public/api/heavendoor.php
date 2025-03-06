@@ -44,7 +44,7 @@ class OperationBatch{
         $tbl_rec=$this->history_tbl->insert(
             $endpoint->accepted_time,
             $endpoint->account->id,
-            $endpoint->stamp->getPowScore32(),
+            $endpoint->stamp->stamp,
             0xffffffff);
         $this->oph_tbl->insert($tbl_rec->id,$method,$operation);
     }

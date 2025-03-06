@@ -29,5 +29,5 @@ from jsonpostcl import JsonpostCl
     # #     else:
     # #         parser.print_help()
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --new-server-name".split(" "))
-# JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[5,0.01,0.8]]".split(" "))
-JsonpostCl.main("setparams http://127.0.0.1:8000/api --welcome false".split(" "))
+JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[5,0.01,0.8]]".split(" "))
+# JsonpostCl.main("setparams http://127.0.0.1:8000/api --welcome false".split(" "))

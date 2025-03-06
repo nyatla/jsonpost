@@ -5,6 +5,6 @@ class HistoryRecord{
     public int $id;
     public int $timestamp;
     public int $id_account;
-    public int $pow_score;
+    public string $powstamp;
     public int $pow_required;
 }

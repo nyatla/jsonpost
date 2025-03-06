@@ -139,8 +139,8 @@ CREATE TABLE history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp INTEGER NOT NULL,   -- [RO]実行日時（UNIXタイムスタンプを想定）
     id_account INTEGER NOT NULL,  -- [RO]操作を行ったアカウント
-    pow_score INTEGER NOT NULL,   -- [RO]登録時に使用したPowScoreの値
     pow_required INTEGER NOT NULL,-- [RO]登録時に要求されていたPowScoreの値
+    powstamp BLOB NOT NULL   -- [RO]登録時に使用したPowStamp
 );
 ```
 検討事項

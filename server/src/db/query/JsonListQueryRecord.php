@@ -12,7 +12,7 @@ class JsonListQueryRecord {
     public $timestamp;
     public $hash;
     public $size;
-    public $pow_score;
+    public $powstamp;
     public $pow_required;
     public function uuidHistoryAsText():string{
         return UuidWrapper::bin2text($this->uuid_history);
@@ -52,7 +52,7 @@ class JsonListQueryRecord {
                 jhl.id_json_storage,
                 h.id_account,
                 h.timestamp,
-                h.pow_score,
+                h.powstamp,
                 h.pow_required
             FROM json_history_limited jhl
             JOIN history h ON jhl.id_history = h.id
@@ -64,7 +64,7 @@ class JsonListQueryRecord {
                 hl.timestamp,    -- 登録日時
                 hl.uuid_history, -- documentのuuidに相当
                 js.hash,         -- documentのhash
-                hl.pow_score,
+                hl.powstamp,
                 hl.pow_required,
                 length(js.json) as size
             FROM json_storage js
@@ -78,7 +78,7 @@ class JsonListQueryRecord {
                 jhs.timestamp,        
                 jhs.hash,
                 jhs.size,
-                jhs.pow_score,
+                jhs.powstamp,
                 jhs.pow_required
             FROM filtered_json_storage jhs
             JOIN account_root a ON jhs.id_account = a.id  -- json_history_limitedとhistoryをid_historyで結合

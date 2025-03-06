@@ -26,7 +26,7 @@ class History
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp INTEGER NOT NULL,   -- [RO]データの投入時刻(UNIXタイムスタンプを想定
             id_account INTEGER NOT NULL,  -- [RO]操作を行ったアカウント
-            pow_score INTEGER NOT NULL,    -- [RO]登録時に使用したPowScore
+            powstamp BLOB NOT NULL,    -- [RO]登録時に使用したPowStamp
             pow_required INTEGER NOT NULL -- [RO]要求されていたPowScore
         );";
 
@@ -40,21 +40,21 @@ class History
      * 
      * @param int $timestamp
      * @param int $id_account
-     * @param int $pow_score
+     * @param int $powstamp
      * @param int $pow_algolithm
      */
-    public function insert(int $timestamp, int $id_account,int $pow_score,int $pow_required):HistoryRecord
+    public function insert(int $timestamp, int $id_account,string $powstamp,int $pow_required):HistoryRecord
     {
 
         // SQLクエリを準備して実行
         $sql = "
-        INSERT INTO $this->name (timestamp, id_account, pow_score,pow_required)
-        VALUES (:timestamp, :id_account, :pow_score,:pow_required);
+        INSERT INTO $this->name (timestamp, id_account, powstamp,pow_required)
+        VALUES (:timestamp, :id_account, :powstamp,:pow_required);
         ";
         $stmt = $this->db->prepare($sql);
         $stmt->bindParam(':timestamp', $timestamp, PDO::PARAM_INT);
         $stmt->bindParam(':id_account', $id_account, PDO::PARAM_INT);
-        $stmt->bindParam(':pow_score', $pow_score, PDO::PARAM_INT);
+        $stmt->bindParam(':powstamp', $powstamp, PDO::PARAM_LOB);
         $stmt->bindParam(':pow_required', $pow_required, PDO::PARAM_INT);
         $stmt->execute();
         // 挿入したレコードのIDを取得

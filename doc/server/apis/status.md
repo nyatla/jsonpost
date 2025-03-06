@@ -94,10 +94,11 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
 {
     "success": true,
     "result": {
-        "welcome": {
+        "setting": {
             "version": "nyatla.jp:jsonpost:1",
             "server_name": null,
-            "pow_algorithm": "tlsln(5,0.01,0.8)"
+            "pow_algorithm": "tlsln(5,0.01,0.8)",
+            "welcome":true
         },
         "root": {
             "latest_pow_time": 1740805038765

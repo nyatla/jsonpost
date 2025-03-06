@@ -45,7 +45,7 @@ function konnichiwa($db,$rawData):IResponseBuilder
     $jsh_table=new JsonStorageHistory($db);
 
     $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($request,JSON_UNESCAPED_UNICODE));
-    $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->getPowScore32(),$endpoint->required_pow);
+    $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->stamp,$endpoint->required_pow);
     $jsh_rec=$jsh_table->insert($hs_rec->id,$js_rec->id);    
     //アップデートのバッチ処理/
 
