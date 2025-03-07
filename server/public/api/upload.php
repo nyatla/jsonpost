@@ -19,7 +19,55 @@ use Jsonpost\utils\{JCSValidator};
 use Opis\JsonSchema\{Validator, Errors\ErrorFormatter};
 
 
+class JcsLikeJsonEncoder
+{
+    /**
+     * JCSライクJSONエンコード（連想配列のキーのみソート）
+     *
+     * @param mixed $data
+     * @return string
+     */
+    public function encode($data): string
+    {
+        $sortedData = $this->sortAssocRecursive($data);
+        return json_encode($sortedData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
 
+    /**
+     * 連想配列のキーを再帰的にUTF-8バイト順でソート
+     *
+     * @param mixed $data
+     * @return mixed
+     */
+    private function sortAssocRecursive($data)
+    {
+        if (is_array($data) && $this->isAssocArray($data)) {
+            $keys = array_keys($data);
+            usort($keys, 'strcmp');  // UTF-8バイト順ソート（PHP標準関数）
+
+            $sorted = [];
+            foreach ($keys as $key) {
+                $sorted[$key] = $this->sortAssocRecursive($data[$key]);
+            }
+            return $sorted;
+        } elseif (is_array($data)) {
+            // 通常の配列（リスト）は順序そのまま
+            return array_map([$this, 'sortAssocRecursive'], $data);
+        }
+        return $data;
+    }
+
+    /**
+     * 連想配列かどうかを判定
+     *
+     * @param array $array
+     * @return bool
+     */
+    private function isAssocArray(array $array): bool
+    {
+        return array_keys($array) !== range(0, count($array) - 1);
+    }
+}
 
 
 
@@ -28,7 +76,10 @@ function upload($db,$rawData):IResponseBuilder
 {
 
     $endpoint=PoWAccountRequiredEndpoint::create($db,$rawData);
-    
+    //書き込むデータは、JCSの場合はそのまま、そうでなければソートしたJCSライクなJSON
+
+    $upload_data=null;
+    //JCSチェック
     if($endpoint->properties->json_jcs){
         $v=new JCSValidator();
         try{
@@ -37,7 +88,9 @@ function upload($db,$rawData):IResponseBuilder
             $m=$e->getMessage();
             ErrorResponseBuilder::throwResponse(301,"Not JCS compatible.:$m");
         }
+        $upload_data=$rawData;
     }
+    //JSONスキーマチェック
     if($endpoint->properties->json_schema!=null){
         // JSONスキーマとデータをデコード
         $schema = $endpoint->properties->json_schema;
@@ -51,12 +104,22 @@ function upload($db,$rawData):IResponseBuilder
             $em=$errors[0];
             ErrorResponseBuilder::throwResponse(301,"Json scheam not valid.:$em");
         }
+        if($upload_data==null){
+            $jle=new JcsLikeJsonEncoder();
+            $upload_data=$jle->encode($data);
+        }    
     }else{
-        $request = json_decode($rawData, true);
-        if ($request === null) {
+        $data = json_decode($rawData, true);
+        if ($data === null) {
             ErrorResponseBuilder::throwResponse(301,'Invalid JSON format.');
-        }            
+        }
+        if($upload_data==null){
+            $jle=new JcsLikeJsonEncoder();
+            $upload_data=$jle->encode(data: $data);
+        }
     }
+    assert($upload_data!=null);
+    
 
 
     //ここから書込み系の
@@ -66,7 +129,7 @@ function upload($db,$rawData):IResponseBuilder
     $js_tbl=new JsonStorage($db);
     $hs_tbl=new History($db);
     $jsh_table=new JsonStorageHistory($db);
-    $js_rec=$js_tbl->selectOrInsertIfNotExist($rawData);
+    $js_rec=$js_tbl->selectOrInsertIfNotExist($upload_data);
     // $js_rec=$js_tbl->selectOrInsertIfNotExist($rawData);
     $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->stamp,$endpoint->required_pow);
     $jsh_rec=$jsh_table->insert($hs_rec->id,$js_rec->id);    

@@ -1,9 +1,64 @@
 
-from typing import Iterator,Tuple;
-
 
 from typing import Iterator, Iterable, Sequence, Union
+import json
+from decimal import Decimal
+from typing import Any
 
+class JCSSerializer:
+    def __init__(self):
+        pass
+
+    def _jcs_sort_key(self, key: str) -> bytes:
+        return key.encode('utf-8')
+
+    def _normalize_number(self, value):
+        """
+        数値の正規化
+        - 1.0 => "1"
+        - 不要な指数表記を排除
+        - Decimalに変換して正規化し、文字列化
+        """
+        if isinstance(value, float) or isinstance(value, Decimal):
+            decimal_value = Decimal(str(value))
+            if decimal_value == decimal_value.to_integral():
+                return str(int(decimal_value))  # 整数化（"1"）
+            return format(decimal_value.normalize(), 'f')  # 小数形式に（"1.23"など）
+        return value
+
+    def _prepare_jcs(self, obj: Any) -> Any:
+        """
+        オブジェクトのキー順ソート＋数値正規化
+        """
+        if isinstance(obj, dict):
+            return {
+                k: self._prepare_jcs(obj[k])
+                for k in sorted(obj.keys(), key=self._jcs_sort_key)
+            }
+        elif isinstance(obj, list):
+            return [self._prepare_jcs(v) for v in obj]
+        else:
+            return self._normalize_number(obj)
+
+    def dumps(self, obj: Any) -> str:
+        """
+        JCS準拠JSON生成
+        """
+        prepared = self._prepare_jcs(obj)
+
+        def decimal_default(o):
+            if isinstance(o, Decimal):
+                return str(o)
+            raise TypeError(f"Type {type(o)} not serializable")
+
+        return json.dumps(
+            prepared,
+            ensure_ascii=False,
+            separators=(',', ':'),
+            sort_keys=False,
+            default=decimal_default  # Decimalをそのまま文字列出力
+        )
+    
 class CharIterator(Iterator[str]):
     def __init__(self, s: Union[Iterable[str], Iterator[str], Sequence[str]]):
         self.p = 0

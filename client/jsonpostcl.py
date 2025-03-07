@@ -12,6 +12,7 @@ from typing import ClassVar,Optional,List
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from libs.powstamp import PowStampBuilder,PowStamp
 from libs.ecdsa_utils import EcdsaSignner
+from libs.jcs import JCSSerializer
 
 
 
@@ -120,6 +121,8 @@ class JsonpostCl:
             raise NotImplementedError("Subclasses must implement the add_arguments method")
 
     class InitCommand(CommandBase):
+        """ クライアントのコンフィギュレーションファイルを作成する。
+        """
         def execute(self):
             # Check if the configuration file already exists, and show two warnings
             if os.path.exists(self.args.filename):
@@ -146,58 +149,61 @@ class JsonpostCl:
 
 
     class UploadCommand(CommandBase):
+        """ JSONをアップロードする
+        """
         def execute(self):
             # 設定ファイルの読み込み
             config = JsonpostCl.AppConfig.load(self.args.config)
-            
-            # -fオプションが指定された場合（ファイルから読み込み）
+
+            #テキストデータを得る
+            data=None
             if self.args.filename:
                 with open(self.args.filename, 'r') as f:
-                    json_obj = json.load(f)
+                    data=f.read()
             elif self.args.json:
                 # -jオプションが指定された場合（直接JSON文字列）
-                json_obj = json.loads(self.args.json)
-            elif self.args.data:
-                # upload コマンドの引数として指定された文字列を JSON として処理
-                json_obj = json.loads(self.args.data)
+                data=self.args.json
             elif not sys.stdin.isatty():
                 # 標準入力から受け取った JSON を処理
-                json_obj = json.load(sys.stdin)
+                data = sys.stdin
             else:
                 print("Error: Either -f (filename), -j (JSON string), or data via stdin must be provided.")
                 return
-
-
-            d_json=json.dumps(json_obj, ensure_ascii=False).encode('utf-8')
-
-
+            #成型
+            if self.args.normalize=='json':
+                data=json.dumps(json.loads(data))
+            elif self.args.normalize=='jcs':
+                jcss=JCSSerializer()
+                data=jcss.dumps(json.loads(data))
+            else:
+                pass
+            data=data.encode('utf-8')
+            
             powtarget=config.params_pow_target if self.args.powtarget==0 else self.args.powtarget
             print(f"Target Pow score:{powtarget}")
             print(f"Start hashing!")
             espow:PowStamp=None
             with PerformanceTimer() as pf:
-
                 #ここはｶｯｺｲｲHasherにしたい。
 
                 # ハッシュ処理
-                espow = config.generatePoWStamp(self.args.nonce,self.args.server_name ,d_json,powtarget)            
+                espow = config.generatePoWStamp(self.args.nonce,self.args.server_name ,data,powtarget)            
                 pownonce = espow.powNonceAsInt  # ハッシュ値（または結果）
                 elapsed_time=pf.elapseInMs
                 # ハッシュレートを計算 (ハッシュ数/秒)
                 hash_rate = pownonce / elapsed_time if elapsed_time > 0 else 0
                 # 結果をプリント
-                # print(espow.powbits,espow.sha256d.hex())
-                
+                # print(espow.powbits,espow.sha256d.hex())                
                 print(f"accepted: {espow.powScore32}/{pownonce} ({espow.powScore32*100/(32-math.log2(powtarget)):.2f}%) {round(hash_rate)}hash/s (yay!!!)")
 
 
             # verbose が指定された場合、送信する JSON データを表示
             if self.args.verbose:
                 print("Upload data :")
-                print(f"X-PowStamp",espow.stamp.hex())
-                print(f"HASH",espow.hash.hex())
-                print("JSON:")
-                print(d_json.decode())
+                print(f"X-PowStamp :",espow.stamp.hex())
+                print(f"HASH :",espow.hash.hex())
+                print("JSON :")
+                print(data.decode())
             
             # ヘッダーの指定（charset=utf-8を指定）
             headers = {
@@ -208,7 +214,7 @@ class JsonpostCl:
             # アップロード先のエンドポイントに対してPOSTリクエストを送信
             ep=f"{self.args.endpoint}/upload.php"
             print(f"Uploading to {ep}...")
-            response = requests.post(ep, data=d_json, headers=headers)
+            response = requests.post(ep, data=data, headers=headers)
 
 
             # 結果の表示
@@ -227,11 +233,11 @@ class JsonpostCl:
             group = upload_parser.add_mutually_exclusive_group(required=False)
             group.add_argument("-F", "--filename", type=str, help="The filename to upload")
             group.add_argument("-J", "--json", type=str, help="JSON string to upload")
-            upload_parser.add_argument("data", nargs='?', type=str, help="JSON string provided directly after the command")        
             upload_parser.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
             upload_parser.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
-            upload_parser.add_argument("--nonce", type=int, required=False, default=None, help="The nonce for the upload")
+            upload_parser.add_argument("-N","--nonce", type=int, required=False, default=None, help="The nonce for the upload")
             upload_parser.add_argument("-P","--powtarget", type=int, required=False, default=0x0fffffff, help="Target PoW score.")
+            upload_parser.add_argument("--normalize", type=str, choices=['raw','jcs','json'],required=False, default='jcs', help="Formatting before sending.")
             upload_parser.add_argument("--verbose", action="store_true", help="Display the JSON data being uploaded.")
         
             upload_parser.set_defaults(func=JsonpostCl.UploadCommand)

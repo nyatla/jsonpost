@@ -3,7 +3,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from jsonpostcl import JsonpostCl
 
 for i in range(1):
-    JsonpostCl.main(f"upload http://127.0.0.1:8000/api {{\"name\":1}} -P 20000000 --config ./jsonpost.cfg.json --verbose".split(" "))
+    JsonpostCl.main(f"upload http://127.0.0.1:8000/api --normalize json -J {{\"name\":1,\"age\":2.01}} -P 20000000 --config ./jsonpost.cfg.json --verbose".split(" "))
     # JsonpostCl.main(f"upload http://127.0.0.1:8000/api {{\"key2\":\"aaa{i}\"}} -P 20000000 --config ./jsonpost.cfg.json --verbose".split(" "))
     import time;        
     time.sleep(1)
