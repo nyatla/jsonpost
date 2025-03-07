@@ -19,21 +19,24 @@ GET /status.php
 
 ```json
 {
-    "success": true,
-    "result": {
-        "setting": {
-            "version": "nyatla.jp:jsonpost:1",
-            "server_name": null,
-            "pow":{
-                "algolitm":"tlsln",
-                "params":[5,16,0.8]
-            },
-            "welcome":true
+    "success":true,
+    "result":{
+        "settings":{
+            "version":"nyatla.jp:jsonpost:1",
+            "server_name":null,
+            "pow_algorithm":[
+                "tlsln",[5,0.1,3.8]
+            ],
+            "welcome":false,
+            "json":{
+                "jcs":true,
+                "schema":{"type":"object","properties":{"name":{"type":"string"},"level":{"type":"number"}}}
+            }
         },
-        "root": {
-            "latest_pow_time": 0
+        "root":{
+            "latest_pow_time":0
         },
-        "account": null
+        "account":null
     }
 }
 ```
@@ -45,24 +48,18 @@ GET /status.php
 
 - **result**  
     結果を格納します。
-
-    - **setting**  
-        サーバーの基本情報を格納します。
-        - **version**  
-            サーバーのバージョンです。
-        - **server_name**  
-            サーバーの名称です。
-        - **pow_algorithm**  
-            PowStampの閾値計算に使用するアルゴリズムとパラメータです。
-        - **welcome**
-            未認証アカウントを受け付けるかどうかのフラグ
-    - **root**  
-        アカウント共通の情報を格納します。
-        - **latest_pow_time**  
-            pow計算に使用される起点時刻[ms-unix-time]です。
-
-    - **account**  
-        null（PowStampなしの場合はアカウント情報は含まれません）。
+  - **setting**  
+    現在の設定値を格納します。
+    - **version**  
+    サーバーのバージョンです。
+    - **その他**
+    現在の設定値です。
+  - **root**  
+    アカウント共通の情報を格納します。
+    - **latest_pow_time**  
+    pow計算に使用される起点時刻[ms-unix-time]です。
+  - **account**  
+  null（PowStampなしの場合はアカウント情報は含まれません）。
 
 ---
 
@@ -92,20 +89,26 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
 
 ```json
 {
-    "success": true,
-    "result": {
-        "setting": {
-            "version": "nyatla.jp:jsonpost:1",
-            "server_name": null,
-            "pow_algorithm": "tlsln(5,0.01,0.8)",
-            "welcome":true
+    "success":true,
+    "result":{
+        "settings":{
+            "version":"nyatla.jp:jsonpost:1",
+            "server_name":null,
+            "pow_algorithm":[
+                "tlsln",[5,0.1,3.8]
+            ],
+            "welcome":false,
+            "json":{
+                "jcs":true,
+                "schema":{"type":"object","properties":{"name":{"type":"string"},"level":{"type":"number"}}}
+            }
         },
-        "root": {
-            "latest_pow_time": 1740805038765
+        "root":{
+            "latest_pow_time":0
         },
-        "account": {
-            "uuid": "01955010-e2a3-7368-9b3b-e0ef09caf607",
-            "latest_pow_time": 1740805038765
+        "account":{
+            "uuid":"01956fd7-d887-7183-ae85-ed42af19b9ec",
+            "latest_pow_time":1741348218457
         }
     }
 }
@@ -115,30 +118,16 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
 
 - **success**  
     処理結果。`true`の場合は成功、`false`の場合は失敗です。
-
-- **result**  
-    取得結果の詳細情報です。
-
-    - **welcome**  
-        サーバーの基本情報を格納します。
-        - **version**  
-            サーバーのバージョンです。
-        - **server_name**  
-            サーバーの名称です。
-        - **pow_algorithm**  
-            PowStampの閾値計算に使用するアルゴリズムとパラメータです。
-
-    - **root**  
-        アカウント共通の情報を格納します。
-        - **latest_pow_time**  
-            pow計算に使用される起点時刻[ms-unix-time]です。
-
-    - **account**  
-        認証されたアカウントの情報を格納します。
-        - **uuid**  
-            アカウントのUUIDです。
-        - **latest_pow_time**  
-            アカウントごとのpow計算に使用される起点時刻[ms-unix-time]です。
+  - **result**  
+    Powなしと同一です。
+  - **root**  
+    Powなしと同一です。
+  - **account**  
+    PowStampで識別されたアカウントの情報を格納します。
+    - **uuid**  
+        アカウントのUUIDです。
+    - **latest_pow_time**  
+        アカウントごとのpow計算に使用される起点時刻[ms-unix-time]です。
 
 ---
 

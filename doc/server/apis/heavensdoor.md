@@ -27,10 +27,11 @@ Content-Type: application/json
 {
     "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
     "params":{
-        "pow_algorithm":["tlsln",[10,16,0.8]],
         "server_name":null,
+        "pow_algorithm":["tlsln",[10,16,0.8]],
         "welcome":true,
-        
+        "json_schema":null,
+        "json_jcs":false        
     }
 }
 ```
@@ -38,17 +39,19 @@ Content-Type: application/json
 ### パラメータ説明
 
 - **server_name**  
-    サーバーのドメイン名として登録します。  
-    以降のPowStamp生成時に必要になります。  
+    サーバーのドメイン名として登録します。  以降のPowStamp生成時に必要になります。  
     同名サーバー間では認証情報を共有できます。
-
-- **pow_algorithm**
+- **pow_algorithm**  
     サーバーが使用するPoW閾値決定アルゴリズムを指定します。`tnsln` のみ指定可能です。  
     - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
     - 上記例では、「アップロード間隔5秒」「JSONファイルサイズ16KB」を目標とした設定になっています。
+- **welcome**  
+    (省略時:false)新規アカウントのアップロードと登録を受け付けるかを指定します。
+- **json_schema**  
+    (省略時:null)JSON-Schemaでアップロード可能なJSONを制限する場合に指定します。指定可能なスキーマのバージョンはドラフト6、7です。
+- **json_jcs**  
+    (省略時:false)アップロード可能なJSONをJCS準拠の物だけに制限するかのフラグです。
 
-- **welcome**
-    新規アカウントのアップロードと登録を受け付けるかを指定します。
 
 ---
 
@@ -58,12 +61,13 @@ Content-Type: application/json
 
 ```json
 {
-    "success": true,
-    "result": {
-        "god": "02cf751b15ce7de09d29aa612a48788b7ce576ba513a50c666404131d2988f5718",
-        "server_name": null,
-        "pow_algorithm": ["tlsln",[5,16,0.8]],
-        "welcome": true
+    "success":true,
+    "result":{
+        "welcome":false,
+        "god":"03edd86f79bd656847f74ad5071e2b6c59d5aaa57c7ca9391a6559bee2a97a04df","server_name":null,
+        "pow_algorithm":["tlsln",[10,16,0.8]],
+        "json_schema":null,
+        "json_jcs":false
     }
 }
 ```
@@ -76,15 +80,9 @@ Content-Type: application/json
 - **result**  
     結果を格納します。
     - **god**  
-        登録された管理者の公開鍵です。  
-        管理者機能を利用する際に必要です。
-    - **server_name**  
-        登録されたサーバー名です。
-    - **pow_algorithm**  
-        設定されたPoWアルゴリズムです。
-    - **welcome**  
-        新規アカウントが登録可能かのフラグです。
-
+        登録された管理者の公開鍵です。
+    - **その他**  
+        設定した値です。  
 ---
 
 #### 失敗時
@@ -116,29 +114,22 @@ Content-Type: application/json
         "pow_algorithm":["tlsln",[10,16,0.8]],
         "server_name":null,
         "welcome":false,
+        "json_schema":null,
+        "json_jcs":false        
     }
 }
 ```
 
 ### パラメータ説明
 
-変更するパラメータのみ指定してください。
+paramsには、変更するパラメータのみ指定してください。
+変更しないパラメータは不要です。
 
-- **server_name**  
-    サーバーのドメイン名として登録します。  
-    以降のPowStamp生成時に必要になります。  
-    同名サーバー間では認証情報を共有できます。
+詳細は?konnichiwaのリクエストを参照してください。
 
-- **pow_algorithm**  
-    サーバーが使用するPoW閾値決定アルゴリズムを指定します。`tnsln` のみ指定可能です。  
-    - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
-    - 上記例では、「アップロード間隔5秒」「JSONファイルサイズ16KB」を目標とした設定になっています。
-
-- **welcome**
-    新規アカウントのアップロードと登録を受け付けるかを指定します。
 ---
 
 ### レスポンス仕様
 
-?konnichiwaと同一です。現在の設定値がそのまま帰ります。
+詳細は?konnichiwaと同一です。
 

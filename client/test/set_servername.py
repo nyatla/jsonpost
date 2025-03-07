@@ -31,6 +31,6 @@ from jsonpostcl import JsonpostCl
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --new-server-name".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[5,0.1,3.8]]".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --welcome false".split(" "))
-# JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-schema ./schema.json".split(" "))
-JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-jcs no".split(" "))
+JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-schema ./schema.json".split(" "))
+# JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-jcs no".split(" "))
 

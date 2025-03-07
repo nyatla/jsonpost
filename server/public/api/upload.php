@@ -154,7 +154,7 @@ function upload($db,$rawData):IResponseBuilder
             'required'=>$endpoint->required_pow,
             'accepted'=>$ps->getPowScore32(),
         ]
-        ], JSON_PRETTY_PRINT);
+        ]);
 }
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');

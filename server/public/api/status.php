@@ -57,17 +57,23 @@ try{
         }
     }
     $r=[
-        'welcome'=>[
+        'settings'=>[
             'version'=>$properties->version,
+            // 'god'=>$properties->god!=$properties->god?null:$properties->god,
             'server_name'=>$properties->server_name,
             'pow_algorithm'=>$properties->pow_algorithm->pack(),
+            'welcome'=>$properties->welcome,
+            'json'=>[
+                'jcs'=>$properties->json_jcs,
+                'schema'=>json_decode($properties->json_schema)
+            ]
         ],
         'root'=>[
             'latest_pow_time'=>$properties->root_pow_accept_time,
         ],
         'account'=>$account_block
     ];
-    (new SuccessResultResponseBuilder($r,JSON_PRETTY_PRINT))->sendResponse();
+    (new SuccessResultResponseBuilder($r))->sendResponse();
 }catch(ErrorResponseBuilder $exception){
     $exception->sendResponse();
 }catch(Exception $e){
