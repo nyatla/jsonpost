@@ -1,7 +1,7 @@
 <?php
 namespace Jsonpost\endpoint;
 
-use Jsonpost\db\tables\nst2024\{PropertiesTable};
+use Jsonpost\db\tables\nst2024\{PropertiesTable,PropertiesRows};
 use Jsonpost\db\tables\{EcdasSignedAccountRoot,EcdasSignedAccountRootRecord};
 use Jsonpost\db\batch\HistoryBatch;
 
@@ -24,18 +24,20 @@ use PDO;
 class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
 {
     private readonly PDO $db;
-    private readonly PropertiesTable $pt;
 
+    
     public readonly EcdasSignedAccountRootRecord $account;
     public readonly int $required_pow;
-    public readonly bool $welcome;
+    public readonly PropertiesRows $properties;
 
-    private function __construct(int $accepted_time,PowStamp $stamp,PDO $db, PropertiesTable $pt,EcdasSignedAccountRootRecord $account, int $required_pow){
+    
+    private function __construct(int $accepted_time,PowStamp $stamp,PDO $db, PropertiesRows $ptr,EcdasSignedAccountRootRecord $account, int $required_pow){
         parent::__construct($accepted_time,$stamp);
         $this->db = $db;
-        $this->pt = $pt;
+        $this->ptr = $ptr;
         $this->account=$account;
         $this->required_pow=$required_pow;
+        $this->properties=$ptr;
     }
 
     public static function create(PDO $db,string $rawData):PoWAccountRequiredEndpoint
@@ -88,7 +90,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         if($pow32>$required_pow){
             ErrorResponseBuilder::throwResponse(205,"Pow score is high. Received:$pow32",hint:['required_score'=>$required_pow]);
         }
-        return new PoWAccountRequiredEndpoint($accepted_time,$stamp,$db,$pt,$ar_ret,$required_pow);
+        return new PoWAccountRequiredEndpoint($accepted_time,$stamp,$db,$pt_rec,$ar_ret,$required_pow);
     }
     /**
      * データベースのPOW-TIMEに打刻する。
@@ -98,7 +100,8 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         if($this->account->is_new_record){
             //新規レコードの場合はRootの受理時刻も更新
             //アカウントごとの情報は先に投入した初期値がある。
-            $this->pt->upsert(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME,$this->accepted_time);
+            $pt=new PropertiesTable ($this->db);
+            $pt->upsert(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME,$this->accepted_time);
         }else{
             //既存レコードの場合はnonceを更新しておく
             $et=new EcdasSignedAccountRoot($this->db);

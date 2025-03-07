@@ -56,6 +56,7 @@ function byOffset($db,$uuid,$path,$is_raw): IResponseBuilder
         return new SuccessResultResponseBuilder([
             'path'=> $path,
             'timestamp'=> $ret->timestamp,
+            'powstamp'=>$ret->powStampAsHex(),
             'uuid_account'=>$ret->uuidAccountAsText(),
             'uuid_document'=>$ret->uuidHistoryAsText(),
             'json'=>$found

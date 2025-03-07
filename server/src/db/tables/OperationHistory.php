@@ -24,6 +24,8 @@ class OperationHistory
     public const METHOD_SET_POW_ALGORITHM='set.pow_algorithm';
     public const METHOD_SET_SERVER_NAME='set.server_name';
     public const METHOD_SET_WELCOME='set.welcome';
+    public const METHOD_SET_JSON_SCHEMA='set.json_schema';
+    public const METHOD_SET_JSON_JCS='set.json_jcs';
     private $db;
     public readonly string $name;
 

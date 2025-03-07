@@ -14,6 +14,9 @@ use Jsonpost\Config;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\endpoint\{PoWAccountRequiredEndpoint};
 use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,History};
+use Jsonpost\utils\{JCSValidator};
+
+use Opis\JsonSchema\{Validator, Errors\ErrorFormatter};
 
 
 
@@ -21,36 +24,57 @@ use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,History};
 
 
 // アップロードAPIの処理
-function konnichiwa($db,$rawData):IResponseBuilder
+function upload($db,$rawData):IResponseBuilder
 {
 
     $endpoint=PoWAccountRequiredEndpoint::create($db,$rawData);
-    $ps=$endpoint->stamp;
     
+    if($endpoint->properties->json_jcs){
+        $v=new JCSValidator();
+        try{
+            $v->isJcsToken($rawData);
+        }catch(\Exception $e){
+            $m=$e->getMessage();
+            ErrorResponseBuilder::throwResponse(301,"Not JCS compatible.:$m");
+        }
+    }
+    if($endpoint->properties->json_schema!=null){
+        // JSONスキーマとデータをデコード
+        $schema = $endpoint->properties->json_schema;
+        $data=json_decode($rawData);
+        // JSONスキーマの検証
+        $validator = new Validator();
+        $validator->setStopAtFirstError(true);
+        $vret = $validator->validate($data, $schema);
+        if ($vret->isValid()=== false) {
+            $errors=(new ErrorFormatter())->formatFlat($vret->error());
+            $em=$errors[0];
+            ErrorResponseBuilder::throwResponse(301,"Json scheam not valid.:$em");
+        }
+    }else{
+        $request = json_decode($rawData, true);
+        if ($request === null) {
+            ErrorResponseBuilder::throwResponse(301,'Invalid JSON format.');
+        }            
+    }
+
+
     //ここから書込み系の
     $ar_rec=$endpoint->account;
-
-    
-    $current_score=$ps->getPowScore32();
-
-    #文章を登録
-    $request = json_decode($rawData, true);
-    if ($request === null) {
-        ErrorResponseBuilder::throwResponse(301,'Invalid JSON format.');
-    }    
 
     //アップデートのバッチ処理
     $js_tbl=new JsonStorage($db);
     $hs_tbl=new History($db);
     $jsh_table=new JsonStorageHistory($db);
-
-    $js_rec=$js_tbl->selectOrInsertIfNotExist(json_encode($request,JSON_UNESCAPED_UNICODE));
+    $js_rec=$js_tbl->selectOrInsertIfNotExist($rawData);
+    // $js_rec=$js_tbl->selectOrInsertIfNotExist($rawData);
     $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->stamp,$endpoint->required_pow);
     $jsh_rec=$jsh_table->insert($hs_rec->id,$js_rec->id);    
     //アップデートのバッチ処理/
 
 
     $endpoint->commitStamp();
+    $ps=$endpoint->stamp;
     return new SuccessResultResponseBuilder(
         [
         'document'=>[
@@ -65,7 +89,7 @@ function konnichiwa($db,$rawData):IResponseBuilder
         'pow'=>[
             'domain'=>$ar_rec->is_new_record?'root':'account',
             'required'=>$endpoint->required_pow,
-            'accepted'=>$current_score,
+            'accepted'=>$ps->getPowScore32(),
         ]
         ], JSON_PRETTY_PRINT);
 }
@@ -88,7 +112,7 @@ try{
     }
 
     // アップロードAPI処理を呼び出す
-    konnichiwa($db, $rawData)->sendResponse();
+    upload($db, $rawData)->sendResponse();
     $db->exec("COMMIT");
 }catch(ErrorResponseBuilder $e){
     $db->exec("ROLLBACK");

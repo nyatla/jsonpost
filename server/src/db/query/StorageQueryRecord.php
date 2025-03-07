@@ -11,6 +11,7 @@ class StorageQueryRecord {
     public string $uuid_account;
     public string $uuid_history;
     public int $timestamp;
+    public string $powstamp;
     public string $json;
     public function uuidHistoryAsText():string{
         return UuidWrapper::bin2text($this->uuid_history);
@@ -18,6 +19,9 @@ class StorageQueryRecord {
     public function uuidAccountAsText():string{
         return UuidWrapper::bin2text($this->uuid_account);
     }    
+    public function powStampAsHex():string{
+        return bin2hex($this->powstamp);
+    }
 
     // クエリメソッド
     public static function query(PDO $db, string $uuid): mixed

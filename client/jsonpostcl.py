@@ -294,6 +294,12 @@ class JsonpostCl:
                 params['server_name']=self.args.new_server_name if len(self.args.new_server_name)>0 else None
             if self.args.welcome is not None:
                 params['welcome']=self.args.welcome
+            if self.args.json_jcs is not None:
+                params['json_jcs']=self.args.json_jcs
+            if self.args.json_schema is not None:
+                with open(self.args.json_schema,'r',encoding='utf-8') as fp:
+                    js=json.load(fp)
+                    params['json_schema']=js
             if len(params)==0:
                 print('No changes detected.')
                 return
@@ -334,6 +340,8 @@ class JsonpostCl:
             sp.add_argument("--pow-algorithm", type=str, default=None, help="Pow difficulty detection algorithm.('[\"tlsln\",[10,16,0.8]]')")
             sp.add_argument("--new-server-name", type=str, nargs="?", const="", default=None, help="New server domain name.")
             sp.add_argument("--welcome", type=str_to_bool, required=False, default=None, help="Accept new accounts.['true','false','0','1','yes','no']")
+            sp.add_argument("--json-jcs", type=str_to_bool, required=False, default='true', help="Accept JCS format only.['true','false','0','1','yes','no']")
+            sp.add_argument("--json-schema", type=str, required=False, default=None, help="Json schema filename")
             sp.set_defaults(func=JsonpostCl.AdminSetparamsCommand)
 
 

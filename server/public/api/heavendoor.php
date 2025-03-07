@@ -53,6 +53,8 @@ class OperationBatch{
         $tbl->upsert(PropertiesTable::VNAME_POW_ALGORITHM,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_POW_ALGORITHM)->operation);
         $tbl->upsert(PropertiesTable::VNAME_SERVER_NAME,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_SERVER_NAME)->operationAsJson());
         $tbl->upsert(PropertiesTable::VNAME_WELCOME,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_WELCOME)->operationAsJson()?1:0);
+        $tbl->upsert(PropertiesTable::VNAME_JSON_SCHEMA,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_SCHEMA)->operationAsJson());
+        $tbl->upsert(PropertiesTable::VNAME_JSON_JCS,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_JCS)->operationAsJson()?1:0);
     }
 }
 
@@ -72,6 +74,8 @@ function finish(OperationBatch $opb,PropertiesTable $tbl_properties){
             PropertiesTable::VNAME_GOD=>$latest_property->god,
             PropertiesTable::VNAME_SERVER_NAME=>$latest_property->server_name,
             PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
+            PropertiesTable::VNAME_JSON_SCHEMA=>json_decode($latest_property->json_schema),
+            PropertiesTable::VNAME_JSON_JCS=>$latest_property->json_jcs
         ]
     );
 }
@@ -121,11 +125,24 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     }catch(Exception $e){
         ErrorResponseBuilder::throwResponse(303,"Unknown algorihm '$algorithm_name'");
     }
-    //welcome
+    //welcome デフォルト値有
     $welcome=$params[PropertiesTable::VNAME_WELCOME]??false;
     if(!is_bool($welcome)){
-        ErrorResponseBuilder::throwResponse(302,'Welcome must be boolean.');
+        ErrorResponseBuilder::throwResponse(302,'welcome must be boolean.');
     }
+    //json_schema デフォルト値有
+    $json_schema=$params[PropertiesTable::VNAME_JSON_SCHEMA]??null;
+    if($json_schema!=null){
+        $json_schema=json_encode($json_schema,JSON_UNESCAPED_UNICODE);
+        //ここでバリデーションチェックかけると完璧
+    }
+    //json_jcs デフォルト値有
+    $json_jcs=$params[PropertiesTable::VNAME_JSON_JCS]??false;
+    if(!is_bool($json_jcs)){
+        ErrorResponseBuilder::throwResponse(302,'json_jcs must be boolean.');
+    }
+
+
 
     // テーブルがすでに存在するかを確認
     $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
@@ -163,6 +180,8 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_SERVER_NAME,$server_name);
     $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
     $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_WELCOME,$welcome);
+    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_JSON_JCS,$json_jcs);
+    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_JSON_SCHEMA,$json_schema);
     // #デバック用
     // $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
 
@@ -226,8 +245,26 @@ function setparams($db,string $rawData): IResponseBuilder
         $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_WELCOME, $welcome);
     }
 
+    //json_schema デフォルト値有
+    if (array_key_exists(PropertiesTable::VNAME_JSON_SCHEMA, $params)) {
+        $v=json_encode($params[PropertiesTable::VNAME_JSON_SCHEMA],JSON_UNESCAPED_UNICODE);
+        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_JSON_SCHEMA, $v);
+        //ここでバリデーションチェックかけると完璧
+    }
+    //json_jcs デフォルト値有
+    if (array_key_exists(PropertiesTable::VNAME_JSON_JCS, $params)) {
+        $v = $params[PropertiesTable::VNAME_JSON_JCS];
+        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_JSON_JCS, $v);
+    }
+
     return finish($opb,$tbl_properties);
 }
+
+
+
+
+
+
 
 
 // SQLiteデータベースに接続
