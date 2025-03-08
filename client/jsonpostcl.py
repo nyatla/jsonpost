@@ -249,14 +249,25 @@ class JsonpostCl:
         def execute(self):
             # 設定ファイルの読み込み
             config = JsonpostCl.AppConfig.load(self.args.config)
+
+            json_schema=None
+            if self.args.json_schema is not None:
+                with open(self.args.json_schema,'r',encoding='utf-8') as fp:
+                    json_schema=json.load(fp)
+
             data = {
                 "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
                 "params":{
                     "pow_algorithm":self.args.pow_algorithm,
                     "server_name":self.args.server_name,
-                    "welcome":self.args.welcome
+                    "welcome":self.args.welcome,
+                    'json_jcs':self.args.json_jcs,
+                    'json_schema':json_schema
                 }
             }
+
+
+
             d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
             #スタンプの生成
             ps:PowStamp=config.generatePoWStamp(0,self.args.server_name,d_json,0xffffffff)
@@ -286,6 +297,8 @@ class JsonpostCl:
             sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
             sp.add_argument("--pow-algorithm", type=str, required=False, default='["tlsln",[10,16,0.8]]', help="Pow difficulty detection algorithm.")
             sp.add_argument("--welcome", type=str_to_bool, required=False, default=None, help="Accept new accounts.['true','false','0','1','yes','no']")
+            sp.add_argument("--json-jcs", type=str_to_bool, required=False, default=None, help="Accept JCS format only.['true','false','0','1','yes','no']")
+            sp.add_argument("--json-schema", type=str, required=False, default=None, help="Json schema filename")
             sp.set_defaults(func=JsonpostCl.AdminKonnichiwaCommand)
 
 
