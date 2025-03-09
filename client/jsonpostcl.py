@@ -7,7 +7,7 @@ import struct
 import math
 import datetime
 from dataclasses import dataclass, field,replace
-from typing import ClassVar,Optional,List
+from typing import ClassVar,Optional,List,Callable
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 from libs.powstamp import PowStampBuilder,PowStamp
@@ -56,12 +56,12 @@ class JconpostStampedApi:
         }
         if self.pk is not None:
             psb=PowStampBuilder(self.pk)
-            ps=psb.encode(0,self.server_name,None,0xffffffff)
+            ps=psb.createStamp(0,self.server_name,None,0xffffffff)
             headers["PowStamp-1"]=ps.stamp.hex()
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.endpoint}/status.php"
         if self.verbose:
-            print("[header]",headers)
+            print(f"PowStamp:{ps.stamp.hex()}")
         response = requests.get(ep, headers=headers)
         if with_update and response==200:
             try:
@@ -80,13 +80,7 @@ class JconpostStampedApi:
 
 
         ...
-    @classmethod
-    def generateTimeNonce(cls)->PowStamp:
-        start_time = datetime.datetime(2000, 1, 1, 0, 0)
-        current_time = datetime.datetime.now()
-        elapsed_time = (current_time - start_time).total_seconds()
-        # UINT32として格納できる範囲に収める
-        return int(elapsed_time) % (2**32)
+
 
     def godKonnichiwa(self,pow_algolithm:str,server_name:str|None,welcome:bool,json_jcs:bool,json_schema_fpath:str|None)->requests.Response:
         """ konnichiwaを実行する。
@@ -110,12 +104,14 @@ class JconpostStampedApi:
         
         #スタンプの生成
         psb=PowStampBuilder(self.pk)
-        ps=psb.encode(0,server_name,d_json,0xffffffff)        
+        ps=psb.createStamp(0,server_name,d_json,0xffffffff)        
         
         headers = {
             "Content-Type": "application/json; charset=utf-8",
             "PowStamp-1":ps.stamp.hex(),
         }
+        if self.verbose:
+            print(f"PowStamp:{ps.stamp.hex()}")
 
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.endpoint}/heavendoor.php?konnichiwa"
@@ -153,58 +149,71 @@ class JconpostStampedApi:
         d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
         #スタンプの生成
         psb=PowStampBuilder(self.pk)
-        ps=psb.encode(0,self.server_name,d_json,0xffffffff)        
+        ps=psb.createStamp(0,self.server_name,d_json,0xffffffff)        
         # ヘッダーの指定（charset=utf-8を指定）
         headers = {
             "Content-Type": "application/json; charset=utf-8",
             "PowStamp-1":ps.stamp.hex(),
         }
+        if self.verbose:
+            print(f"PowStamp:{ps.stamp.hex()}")
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.endpoint}/heavendoor.php?setparams"
         return requests.post(ep, data=d_json, headers=headers)
 
-    def upload(self,payload:str,timeout:float=2,retry:int=3)->requests.Response:
-        target_score=None
-
-        def tryUpload(payload:str,timeout:float,target:int|None)->requests.Response:
-            def callback(stamp:PowStamp)->bool:
-                if target is not None and stamp.powScore32<=target:
-                    return False
-                return True
-
-            psb=PowStampBuilder(self.pk)
-            #ハッシング
-            ps=psb.encodeWithTimeOut(self.nocne,self.server_name,payload,round(timeout*1000),callback)
-            # ヘッダーの指定（charset=utf-8を指定）
+    def upload(self,payload:str,timeout:float=2,retry:int=3,print_progress:bool=True)->requests.Response:
+        target_score=0
+        psb=PowStampBuilder(self.pk)
+        psg=psb.createStampGenerator(self.nocne,self.server_name,payload)
+        response=None
+        best=0xffffffff
+        best_ps=None
+        if print_progress: print(f"Start hasing: target={target_score}")
+        for i in range(retry):
+            hash_counter=0
+            if print_progress and best_ps is not None: print(f"\rScore/Hash: {best:010}/{best_ps.hash.hex()}",end="")
+            with PerformanceTimer(False) as pt:
+                while (pt.elapseInMs<(timeout*1000) and target_score<best) or best_ps is None:
+                    ps=next(psg)
+                    hash_counter+=1
+                    if ps.powScore32>=best and best_ps is not None:
+                        continue
+                    #found
+                    best=ps.powScore32
+                    best_ps=ps
+                    if print_progress: print(f"\rScore/Hash: {best:010} {ps.hash.hex()}",end="")
+            if print_progress: print(f"\nHashed. {round(hash_counter*1000/pt.elapseInMs) if pt.elapseInMs>0 else '-'} hash/s")
+            if print_progress: print(f"detected:{best_ps.hash.hex()}")
+            #タイムアウト
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
-                "PowStamp-1":ps.stamp.hex()
+                "PowStamp-1":best_ps.stamp.hex()
             }
+            if self.verbose:
+                if print_progress: print(f"PowStamp:{best_ps.stamp.hex()}")
             # アップロード先のエンドポイントに対してPOSTリクエストを送信
             ep=f"{self.endpoint}/upload.php"
             response = requests.post(ep, data=payload, headers=headers)
-            return response
-        
-        response=None
-        for i in range(retry):
-            response=tryUpload(payload,timeout,target_score)
             try:
                 j=response.json()            
                 if j["success"]:
                     self.nocne=j["result"]["account"]["nonce"]
+                    #成功
                     return response
                 else:
                     code=j["error"]["code"]
                     if code==205:
                         #nonce,目標Powを設定してハッシング
                         target_score=j["error"]["hint"]["required_score"]
+                        if print_progress: print(f"205 error: retarget to {target_score}. retry({i+1}/{retry})")
                         continue
                     else:
                         pass
             except json.JSONDecodeError:
                 pass
-            break
+        #失敗お
         return response
+
 
 
 
@@ -372,9 +381,9 @@ class JsonpostCl:
                 nonce=config.params_nonce+1 if self.args.nonce is None else self.args.nonce,#現在の値+1で設定
                 server_name=config.params_server_name if self.args.server_name is None else self.args.server_name)
 
-
-            print(f"Start hashing!")            
-            ret=api.upload(data,self.args.timeout,self.args.rounds)
+            def hasher_callback(msg:str):
+                print(msg)
+            ret=api.upload(data,self.args.timeout,self.args.rounds,hasher_callback)
             # if self.args.verbose:
             #     print("Upload data :")
             #     print(f"X-PowStamp :",espow.stamp.hex())
@@ -422,8 +431,8 @@ class JsonpostCl:
             upload_parser.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
             upload_parser.add_argument("-N","--nonce", type=int, required=False, default=None, help="The nonce for the upload")
             upload_parser.add_argument("--normalize", type=str, choices=['raw','jcs','json'],required=False, default='jcs', help="Formatting before sending.")
-            upload_parser.add_argument("--timeout", type=float, default=2.0,required=False, help="Hashing timeout per each round in second.")
-            upload_parser.add_argument("--rounds", type=int, default=5,required=False, help="Hashing rounds")
+            upload_parser.add_argument("--timeout", type=float, default=5.0,required=False, help="Hashing timeout per each round in second.")
+            upload_parser.add_argument("--rounds", type=int, default=3,required=False, help="Hashing rounds")
             upload_parser.add_argument("--verbose", action="store_true", help="Display the JSON data being uploaded.")
         
             upload_parser.set_defaults(func=JsonpostCl.UploadCommand)
