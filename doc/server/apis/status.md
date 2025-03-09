@@ -108,7 +108,8 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
         },
         "account":{
             "uuid":"01956fd7-d887-7183-ae85-ed42af19b9ec",
-            "latest_pow_time":1741348218457
+            "latest_pow_time":1741348218457,
+            "nonce":0
         }
     }
 }
@@ -128,6 +129,8 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
         アカウントのUUIDです。
     - **latest_pow_time**  
         アカウントごとのpow計算に使用される起点時刻[ms-unix-time]です。
+    - **latest_pow_time**  
+        現在のnonce値です。
 
 ---
 
@@ -135,3 +138,7 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
 
 エラーが発生した場合は、[`エラーコード`](./errorcodes.md) を参照してください。
 
+## 値の評価
+
+そのアカウントのnonceが知りたい場合はPoWStampを使用して問い合わせを行います。
+問い合わせ結果がエラーの場合、0と仮定できます。

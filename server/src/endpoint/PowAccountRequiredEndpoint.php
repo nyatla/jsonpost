@@ -64,7 +64,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
 
         //nonce順位の確認。初めての場合はnonce=0スタート
         if($ar_ret->nonce>=$stamp->getNonceAsInt()){
-            ErrorResponseBuilder::throwResponse(204,'Nonce must be greater than or equal to the current value.',hint:['current'=>$ar_ret->nonce]);
+            ErrorResponseBuilder::throwResponse(204,'Nonce must be greater than to the current value.',hint:['current'=>$ar_ret->nonce]);
         }
         #powFieldの確認
         $pow32 = $stamp->getPowScore32();

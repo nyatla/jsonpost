@@ -4,9 +4,9 @@
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import ClassVar,Optional,List
+from typing import ClassVar,Optional,List,Callable
 import struct
-
+import time
 from .ecdsa_utils import EcdsaSignner
 
 @dataclass(frozen=True)
@@ -123,7 +123,7 @@ class PowStampBuilder:
     def __init__(self,pk:bytes):
         self.es=EcdsaSignner(pk)
     def encode(self,nonce:int,server_domain:Optional[str]=None,payload:Optional[bytes]=None,target_score:int=0) -> PowStamp:
-        """ signature,pubkey,dataの順で格納します。pubkeyは圧縮キーです。
+        """ target_scoreを満たすPowをハッシングして返す。
         """
         es=self.es
         spubkey=EcdsaSignner.compressPubKey(es.public_key)
@@ -139,6 +139,35 @@ class PowStampBuilder:
             if pw.powScore32<=target_score:
                 return pw
         raise ValueError(f"Failed to find a valid PoW nonce for target_score={target_score}")
+    
+    def encodeWithTimeOut(self,nonce:int,server_domain:Optional[str]=None,payload:Optional[bytes]=None,timeout_in_ms:int=10000,callback: Callable[[PowStamp], bool]=None) -> PowStamp:
+        """ PowStampを指定時間内で探索する。
+            より小さいものが見つかる度にcallbackにより暫定的なPowStampを通知する。callbackがFalseを返したら中断し、最良結果を返す。
+        """
+        start_time = time.time()
+        es = self.es
+        spubkey = EcdsaSignner.compressPubKey(es.public_key)
+        sm = PowStampMessage.create(
+            spubkey,
+            struct.pack('>I', nonce),
+            None if server_domain is None else hashlib.sha256(server_domain.encode()).digest(),
+            None if payload is None else hashlib.sha256(payload).digest()
+        )
+        hash_base = es.sign(sm.message) + spubkey + struct.pack('>I', nonce)
+        best_pow = None
+        best_score = float('inf')
+        
+        for i in range(0xffffffff):
+            pw = PowStamp(hash_base + struct.pack('>I', i))
+            if pw.powScore32 < best_score:
+                best_pow = pw
+                best_score = pw.powScore32
+                if not callback(pw):
+                    break            
+            if (time.time() - start_time) * 1000 >= timeout_in_ms:
+                break
+        assert(best_pow is not None)
+        return best_pow
 
 
 

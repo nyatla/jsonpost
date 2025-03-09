@@ -247,7 +247,8 @@ function setparams($db,string $rawData): IResponseBuilder
 
     //json_schema デフォルト値有
     if (array_key_exists(PropertiesTable::VNAME_JSON_SCHEMA, $params)) {
-        $v=json_encode($params[PropertiesTable::VNAME_JSON_SCHEMA],JSON_UNESCAPED_UNICODE);
+        $p=$params[PropertiesTable::VNAME_JSON_SCHEMA];
+        $v=$p==null?null:json_encode($p,JSON_UNESCAPED_UNICODE);
         $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_JSON_SCHEMA, $v);
         //ここでバリデーションチェックかけると完璧
     }
