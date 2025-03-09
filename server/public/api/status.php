@@ -47,13 +47,15 @@ try{
             //Historyがない
             $account_block=[
                 'uuid'=>$act_rec->uuidAsText(),
-                'latest_pow_time'=>0
+                'latest_pow_time'=>0,
+                'nonce'=>$act_rec->nonce
             ];
         }else{
             $account_block=[
                 'uuid'=>$act_rec->uuidAsText(),
-                'latest_pow_time'=>$hrec->timestamp
-            ];    
+                'latest_pow_time'=>$hrec->timestamp,
+                'nonce'=>$act_rec->nonce
+            ];
         }
     }
     $r=[
