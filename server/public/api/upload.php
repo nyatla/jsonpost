@@ -147,7 +147,7 @@ function upload($db,$rawData):IResponseBuilder
         'account'=>[
             'status'=>$ar_rec->is_new_record?'new':'exist',
             'user_uuid'=>$ar_rec->uuidAsText(),
-            'nonce'=>$ps->getNonceAsInt(),    
+            'nonce'=>$endpoint->next_nonce,    
         ],
         'pow'=>[
             'domain'=>$ar_rec->is_new_record?'root':'account',

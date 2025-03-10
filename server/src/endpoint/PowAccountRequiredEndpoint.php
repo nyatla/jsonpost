@@ -29,6 +29,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
     public readonly EcdasSignedAccountRootRecord $account;
     public readonly int $required_pow;
     public readonly PropertiesRows $properties;
+    public readonly int $next_nonce;
 
     
     private function __construct(int $accepted_time,PowStamp $stamp,PDO $db, PropertiesRows $ptr,EcdasSignedAccountRootRecord $account, int $required_pow){
@@ -38,6 +39,10 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         $this->account=$account;
         $this->required_pow=$required_pow;
         $this->properties=$ptr;
+        #次回のnonceの計算
+        $cost=pow(2,(32-log($required_pow,2)));
+        $this->next_nonce=min(0xffffffff,round($account->nonce+$cost+.5));
+
     }
 
     public static function create(PDO $db,string $rawData):PoWAccountRequiredEndpoint
@@ -105,7 +110,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         }else{
             //既存レコードの場合はnonceを更新しておく
             $et=new EcdasSignedAccountRoot($this->db);
-            $et->updateRecord($this->account->id,$this->stamp->getNonceAsInt());
+            $et->updateRecord($this->account->id,$this->next_nonce);
         }
     }
 
