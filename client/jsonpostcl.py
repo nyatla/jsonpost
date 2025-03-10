@@ -173,7 +173,7 @@ class JconpostStampedApi:
             hash_counter=0
             if print_progress and best_ps is not None: print(f"\rScore/Hash: {best:010}/{best_ps.hash.hex()}",end="")
             with PerformanceTimer(False) as pt:
-                while (pt.elapseInMs<(timeout*1000) and target_score<best) or best_ps is None:
+                while (pt.elapseInMs<(timeout*1000) and target_score<=best) or best_ps is None:
                     ps=next(psg)
                     hash_counter+=1
                     if ps.powScore32>=best and best_ps is not None:
@@ -182,7 +182,7 @@ class JconpostStampedApi:
                     best=ps.powScore32
                     best_ps=ps
                     if print_progress: print(f"\rScore/Hash: {best:010} {ps.hash.hex()}",end="")
-            if print_progress: print(f"\nHashed. {round(hash_counter*1000/pt.elapseInMs) if pt.elapseInMs>0 else '-'} hash/s")
+            if print_progress: print(f"\nHashed. {hash_counter} hashes , {round(hash_counter*1000/pt.elapseInMs) if pt.elapseInMs>0 else '-'} hash/s")
             if print_progress: print(f"detected:{best_ps.hash.hex()}")
             #タイムアウト
             headers = {

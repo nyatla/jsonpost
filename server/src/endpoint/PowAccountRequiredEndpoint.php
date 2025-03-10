@@ -62,7 +62,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
             }
         }
 
-        //nonce順位の確認。初めての場合はnonce=0スタート
+        //nonce順位の確認。初めての場合はnonce=0スタート。同一な値は受け入れない。
         if($ar_ret->nonce>=$stamp->getNonceAsInt()){
             ErrorResponseBuilder::throwResponse(204,'Nonce must be greater than to the current value.',hint:['current'=>$ar_ret->nonce]);
         }
@@ -87,7 +87,7 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
             $rate=$pt_rec->pow_algorithm->rate($ep/1000,$json_size/1000);
         }
         $required_pow=(int)(min(0xffffffff,pow(2,32*$rate)));
-        if($pow32>$required_pow){
+        if($pow32>=$required_pow){ #同一値は受け入れない
             ErrorResponseBuilder::throwResponse(205,"Pow score is high. Received:$pow32",hint:['required_score'=>$required_pow]);
         }
         return new PoWAccountRequiredEndpoint($accepted_time,$stamp,$db,$pt_rec,$ar_ret,$required_pow);
