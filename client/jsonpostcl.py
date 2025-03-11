@@ -10,7 +10,7 @@ from dataclasses import dataclass, field,replace
 from typing import ClassVar,Optional,List,Callable
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
-from libs.powstamp import PowStampBuilder,PowStamp
+from libs.powstamp2 import PowStamp2Builder,PowStamp2
 from libs.ecdsa_utils import EcdsaSignner
 from libs.jcs import JCSSerializer
 
@@ -55,9 +55,9 @@ class JconpostStampedApi:
             "Content-Type": "application/json; charset=utf-8"
         }
         if self.pk is not None:
-            psb=PowStampBuilder(self.pk)
-            ps=psb.createStamp(0,self.server_name,None,0xffffffff)
-            headers["PowStamp-1"]=ps.stamp.hex()
+            psb=PowStamp2Builder(self.pk)
+            ps=psb.createStamp(0,self.server_name)
+            headers["PowStamp-2"]=ps.stamp.hex()
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.endpoint}/status.php"
         if self.verbose:
@@ -103,12 +103,12 @@ class JconpostStampedApi:
         d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
         
         #スタンプの生成
-        psb=PowStampBuilder(self.pk)
-        ps=psb.createStamp(0,server_name,d_json,0xffffffff)        
+        psb=PowStamp2Builder(self.pk)
+        ps=psb.createStamp(0,server_name,d_json)        
         
         headers = {
             "Content-Type": "application/json; charset=utf-8",
-            "PowStamp-1":ps.stamp.hex(),
+            "PowStamp-2":ps.stamp.hex(),
         }
         if self.verbose:
             print(f"PowStamp:{ps.stamp.hex()}")
@@ -148,12 +148,12 @@ class JconpostStampedApi:
         }
         d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
         #スタンプの生成
-        psb=PowStampBuilder(self.pk)
-        ps=psb.createStamp(0,self.server_name,d_json,0xffffffff)        
+        psb=PowStamp2Builder(self.pk)
+        ps=psb.createStamp(0,self.server_name,d_json)        
         # ヘッダーの指定（charset=utf-8を指定）
         headers = {
             "Content-Type": "application/json; charset=utf-8",
-            "PowStamp-1":ps.stamp.hex(),
+            "PowStamp-2":ps.stamp.hex(),
         }
         if self.verbose:
             print(f"PowStamp:{ps.stamp.hex()}")
@@ -163,8 +163,8 @@ class JconpostStampedApi:
 
     def upload(self,payload:str,timeout:float=2,retry:int=3,print_progress:bool=True)->requests.Response:
         target_score=0
-        psb=PowStampBuilder(self.pk)
-        psg=psb.createStampGenerator(self.nocne,self.server_name,payload)
+        psb=PowStamp2Builder(self.pk)
+        psg=psb.createStampMessageGenerator(self.nocne+1,self.server_name,payload)
         response=None
         best=0xffffffff
         best_ps=None
@@ -176,21 +176,22 @@ class JconpostStampedApi:
                 while (pt.elapseInMs<(timeout*1000) and target_score<=best) or best_ps is None:
                     ps=next(psg)
                     hash_counter+=1
-                    if ps.powScore32>=best and best_ps is not None:
+                    if ps.powScoreU48>=best and best_ps is not None:
                         continue
                     #found
-                    best=ps.powScore32
+                    best=ps.powScoreU48
                     best_ps=ps
-                    if print_progress: print(f"\rScore/Hash: {best:010} {ps.hash.hex()}",end="")
+                    if print_progress: print(f"\rScore/Hash: {best:015} {ps.hash.hex()}",end="")
             if print_progress: print(f"\nHashed. {hash_counter} hashes , {round(hash_counter*1000/pt.elapseInMs) if pt.elapseInMs>0 else '-'} hash/s")
             if print_progress: print(f"detected:{best_ps.hash.hex()}")
+            ps2=psb.createStampFromMessage(best_ps)
             #タイムアウト
             headers = {
                 "Content-Type": "application/json; charset=utf-8",
-                "PowStamp-1":best_ps.stamp.hex()
+                "PowStamp-2":ps2.stamp.hex()
             }
             if self.verbose:
-                if print_progress: print(f"PowStamp:{best_ps.stamp.hex()}")
+                if print_progress: print(f"PowStamp:{ps2.stamp.hex()}")
             # アップロード先のエンドポイントに対してPOSTリクエストを送信
             ep=f"{self.endpoint}/upload.php"
             response = requests.post(ep, data=payload, headers=headers)
@@ -208,9 +209,9 @@ class JconpostStampedApi:
                         if print_progress: print(f"205 error: retarget to {target_score}. retry({i+1}/{retry})")
                         continue
                     else:
-                        pass
+                        break
             except json.JSONDecodeError:
-                pass
+                break
         #失敗お
         return response
 

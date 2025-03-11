@@ -33,7 +33,7 @@ try{
     $prop_tbl=new PropertiesTable($db);
     $properties=$prop_tbl->selectAllAsObject();
     $account_block=null;
-    if(isset($_SERVER['HTTP_POWSTAMP_1'])){
+    if(isset($_SERVER['HTTP_POWSTAMP_2'])){
         //スタンプがついてたらaccountの情報も取る
         $endpoint=AccountEndpoint::create($db,null);
         #ここに段階右折してるから後で直して

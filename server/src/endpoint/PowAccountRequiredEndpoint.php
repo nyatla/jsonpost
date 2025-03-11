@@ -5,9 +5,10 @@ use Jsonpost\db\tables\nst2024\{PropertiesTable,PropertiesRows};
 use Jsonpost\db\tables\{EcdasSignedAccountRoot,EcdasSignedAccountRootRecord};
 use Jsonpost\db\batch\HistoryBatch;
 
-use Jsonpost\utils\ecdsasigner\PowStamp;
+use Jsonpost\utils\ecdsasigner\PowStamp2;
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
 
+use Jsonpost\utils\ecdsasigner\PowStamp2Message;
 use PDO;
 
 
@@ -23,25 +24,28 @@ use PDO;
  */
 class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
 {
+    private const UINT48_MAX=0x0000ffffffffffff;
     private readonly PDO $db;
 
     
     public readonly EcdasSignedAccountRootRecord $account;
     public readonly int $required_pow;
+    public readonly int $accepted_pow;
     public readonly PropertiesRows $properties;
     public readonly int $next_nonce;
 
     
-    private function __construct(int $accepted_time,PowStamp $stamp,PDO $db, PropertiesRows $ptr,EcdasSignedAccountRootRecord $account, int $required_pow){
+    private function __construct(int $accepted_time,PowStamp2 $stamp,PDO $db, PropertiesRows $ptr,EcdasSignedAccountRootRecord $account, int $required_pow, int $accepted_pow){
         parent::__construct($accepted_time,$stamp);
         $this->db = $db;
         $this->ptr = $ptr;
         $this->account=$account;
         $this->required_pow=$required_pow;
+        $this->accepted_pow=$accepted_pow;
         $this->properties=$ptr;
         #次回のnonceの計算
-        $cost=pow(2,(32-log($required_pow,2)));
-        $this->next_nonce=min(0xffffffff,round($account->nonce+$cost+.5));
+        $cost=pow(2,48-log($required_pow,2));
+        $this->next_nonce=min(self::UINT48_MAX,round($account->nonce+$cost+.5));
 
     }
 
@@ -68,11 +72,12 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
         }
 
         //nonce順位の確認。初めての場合はnonce=0スタート。同一な値は受け入れない。
-        if($ar_ret->nonce>=$stamp->getNonceAsInt()){
+        if($ar_ret->nonce>=$stamp->getNonceAsU48()){
             ErrorResponseBuilder::throwResponse(204,'Nonce must be greater than to the current value.',hint:['current'=>$ar_ret->nonce]);
         }
         #powFieldの確認
-        $pow32 = $stamp->getPowScore32();
+        $powm=$stamp->recoverMessage($pt_rec->server_name, $rawData);
+        $powscore48 = $powm->getPowScoreU48();
 
         $json_size=strlen($rawData);
         $rate=1;
@@ -91,11 +96,11 @@ class PoWAccountRequiredEndpoint extends StampRequiredEndpoint
             //ms->sec,byte->kb換算する
             $rate=$pt_rec->pow_algorithm->rate($ep/1000,$json_size/1000);
         }
-        $required_pow=(int)(min(0xffffffff,pow(2,32*$rate)));
-        if($pow32>=$required_pow){ #同一値は受け入れない
-            ErrorResponseBuilder::throwResponse(205,"Pow score is high. Received:$pow32",hint:['required_score'=>$required_pow]);
+        $required_pow=(int)(min(self::UINT48_MAX,pow(2,48*$rate)));
+        if($powscore48>=$required_pow){ #同一値は受け入れない
+            ErrorResponseBuilder::throwResponse(205,"Pow score is high. Received:$powscore48",hint:['required_score'=>$required_pow]);
         }
-        return new PoWAccountRequiredEndpoint($accepted_time,$stamp,$db,$pt_rec,$ar_ret,$required_pow);
+        return new PoWAccountRequiredEndpoint($accepted_time,$stamp,$db,$pt_rec,$ar_ret,$required_pow,$powscore48 );
     }
     /**
      * データベースのPOW-TIMEに打刻する。

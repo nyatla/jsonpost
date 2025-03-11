@@ -137,7 +137,7 @@ function upload($db,$rawData):IResponseBuilder
 
 
     $endpoint->commitStamp();
-    $ps=$endpoint->stamp;
+
     return new SuccessResultResponseBuilder(
         [
         'document'=>[
@@ -152,7 +152,7 @@ function upload($db,$rawData):IResponseBuilder
         'pow'=>[
             'domain'=>$ar_rec->is_new_record?'root':'account',
             'required'=>$endpoint->required_pow,
-            'accepted'=>$ps->getPowScore32(),
+            'accepted'=>$endpoint->accepted_pow
         ]
         ]);
 }

@@ -1,7 +1,7 @@
 <?php
 namespace Jsonpost\endpoint;
 
-use Jsonpost\utils\ecdsasigner\PowStamp;
+use Jsonpost\utils\ecdsasigner\PowStamp2;
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
 
 use Exception;
@@ -13,8 +13,8 @@ use Exception;
 abstract class StampRequiredEndpoint
 {
     public readonly int $accepted_time;
-    public readonly PowStamp $stamp;
-    protected function __construct(int $accepted_time,PowStamp $stamp)
+    public readonly PowStamp2 $stamp;
+    protected function __construct(int $accepted_time,PowStamp2 $stamp)
     {
         $this->accepted_time=$accepted_time;
         $this->stamp=$stamp;
@@ -22,17 +22,17 @@ abstract class StampRequiredEndpoint
     /**
      * HttpヘッダからPowStampV1ヘッダを読み出す。成功しない場合は適切な例外を搬出します。
      * @throws \Jsonpost\responsebuilder\ErrorResponseBuilder
-     * @return PowStamp|null
+     * @return PowStamp2|null
      */
-    protected static function createStamp(?string $server_name,?string $rawData):PowStamp{
+    protected static function createStamp(?string $server_name,?string $rawData):PowStamp2{
         //スタンプの評価
-        $powstamp1 = $_SERVER['HTTP_POWSTAMP_1'] ?? null;
+        $powstamp1 = $_SERVER['HTTP_POWSTAMP_2'] ?? null;
         if($powstamp1==null){
             ErrorResponseBuilder::throwResponse(201);
         }
         $ps=null;
         try{
-            $ps=new PowStamp(hex2bin($powstamp1));
+            $ps=new PowStamp2(hex2bin($powstamp1));
         }catch(Exception $e){
             ErrorResponseBuilder::throwResponse(201);
         }
@@ -41,7 +41,7 @@ abstract class StampRequiredEndpoint
         // }
         $verify_ret=false;
         try{
-            $verify_ret=PowStamp::verify($ps,$server_name,$rawData);
+            $verify_ret=PowStamp2::verify($ps,$server_name,$rawData);
         }catch(Exception $e){
             //詳細エラーが取れることある。
             ErrorResponseBuilder::throwResponse(203,$e->getMessage());

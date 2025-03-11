@@ -29,10 +29,10 @@ from jsonpostcl import JsonpostCl
     # #     else:
     # #         parser.print_help()
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --server-name aaa".split(" "))
-JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[1,0.02,3.0]]".split(" "))
+# JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[1,0.02,3.0]]".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --welcome false".split(" "))
-# JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-no-schema".split(" "))
+JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-no-schema".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-schema ./schema.json".split(" "))
-# JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-jcs no".split(" "))
+JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-jcs no".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api".split(" "))
 

@@ -4,13 +4,13 @@ namespace Jsonpost\utils\ecdsasigner;
 use Jsonpost\utils\ecdsasigner\EasyEcdsaSignature;
 use Exception;
 
-class PowStampMessage {
+class PowStamp2Message {
     /**
      * EcdsaPublicKey	33	プレフィクス付キー
-     * Nonce	4	メッセージNonce
+     * Nonce	6	メッセージNonce
      * ServerDomainHash(sha256)	32	
      * PayloadHash(sha256)	32	
-     * total	101
+     * total	103
      */
     public readonly string $message;
 
@@ -23,23 +23,31 @@ class PowStampMessage {
     }
 
     public function getNonce(): string {
-        return substr($this->message, 33, 4);
+        return substr($this->message, 33, 6);
     }
 
     public function getServerDomainHash(): string {
-        return substr($this->message, 37, 32);
+        return substr($this->message, 39, 32);
     }
 
     public function getPayloadHash(): string {
-        return substr($this->message, 69, 32);
+        return substr($this->message, 71, 32);
     }
-
+    public function getHash(): string {
+        return hash('sha256', hash('sha256', $this->message, true), true);
+    }
+    public function getPowScoreU48(): int {
+        $hash = $this->getHash();
+        // 6バイトに2バイトのゼロパディングを追加して8バイトにする
+        $padded = "\x00\x00" . substr($hash, 0, 6);
+        return unpack('J', $padded)[1];        
+    }
     public static function create(string $pubkey, string $nonce, ?string $serverDomainHash = null, ?string $payloadHash = null): self {
         
         if (strlen($pubkey) !== 33) {
             throw new Exception("Invalid pubkey length");
         }
-        if (strlen($nonce) !== 4) {
+        if (strlen($nonce) !== 6) {
             throw new Exception("Invalid nonce length");
         }
         
