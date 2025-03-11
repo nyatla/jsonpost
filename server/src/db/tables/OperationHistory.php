@@ -8,6 +8,7 @@ use \PDO as PDO;
 
 
 class OperationHistoryRecord{
+    public int $id;
     public int $id_history;
     public string $method;
     public string $operation; //JSON-string
@@ -19,7 +20,7 @@ class OperationHistoryRecord{
 
 class OperationHistory
 {
-    public const VERSION='OperationHistory:1';
+    public const VERSION='OperationHistory:2';
     public const METHOD_SET_GOD='set.god';
     public const METHOD_SET_POW_ALGORITHM='set.pow_algorithm';
     public const METHOD_SET_SERVER_NAME='set.server_name';
@@ -39,7 +40,8 @@ class OperationHistory
     {
         $sql = "
         CREATE TABLE IF NOT EXISTS $this->name (
-            id_history INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_history INTEGER NOT NULL,
             method TEXT NOT NULL,
             operation JSON
         )";
@@ -67,7 +69,7 @@ class OperationHistory
         $insertedId = $this->db->lastInsertId();
 
         // 新しく挿入したレコードを取得（IDを使って取得）
-        $sql = "SELECT * FROM $this->name WHERE id_history = ? LIMIT 1;";
+        $sql = "SELECT * FROM $this->name WHERE id = ? LIMIT 1;";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$insertedId]);
         
@@ -83,7 +85,7 @@ class OperationHistory
         SELECT * 
         FROM $this->name
         WHERE method = :method
-        ORDER BY id_history DESC
+        ORDER BY id DESC
         LIMIT 1";
 
         $stmt = $this->db->prepare($sql);

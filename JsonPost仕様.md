@@ -170,10 +170,12 @@ CREATE TABLE json_storage_history (
 
 ### operation_history
 Powテーブルのうち、操作に関する付帯情報を記録します。このテーブルの情報はid_historyに結び付けられます。
+一つのid_historyで複数の操作が行われた場合、複数のidに操作を行った順番で登録をします。
 
 ```
 CREATE TABLE operation_history (
-    id_history INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY
+    id_history,
     method TEXT NOT NULL, -- [RO]操作の内容
     params JSON  -- [RO]操作パラメータ
 );
@@ -181,7 +183,8 @@ CREATE TABLE operation_history (
 //set.god
 set.pow_algolism
 set.server_name
-set.welcome
+set.json_jcs
+set.json_schema
 
 
 

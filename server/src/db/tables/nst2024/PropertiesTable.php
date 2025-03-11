@@ -79,17 +79,23 @@ class PropertiesTable
     }
     public function upsert(string $name, ?string $value)
     {
-        $sql = "
-            INSERT OR REPLACE INTO {$this->name} (name, value)
-            VALUES (:name, :value);
-        ";
-    
-        $stmt = $this->db->prepare($sql);
+        // まず、既存のレコードをUPDATE
+        $updateSql = "UPDATE {$this->name} SET value = :value WHERE name = :name;";
+        $stmt = $this->db->prepare($updateSql);
         $stmt->bindValue(':name', $name, PDO::PARAM_STR);
         $stmt->bindValue(':value', $value, PDO::PARAM_STR);
+        $stmt->execute();
     
-        if (!$stmt->execute()) {
-            throw new Exception("Failed to upsert param '{$name}'");
+        // もしUPDATEで何も更新されなかった場合、INSERT
+        if ($stmt->rowCount() === 0) {
+            $insertSql = "INSERT INTO {$this->name} (name, value) VALUES (:name, :value);";
+            $stmt = $this->db->prepare($insertSql);
+            $stmt->bindValue(':name', $name, PDO::PARAM_STR);
+            $stmt->bindValue(':value', $value, PDO::PARAM_STR);
+            
+            if (!$stmt->execute()) {
+                throw new Exception("Failed to insert param '{$name}'");
+            }
         }
     }
     public function selectByNameAsBool(string $name): bool{

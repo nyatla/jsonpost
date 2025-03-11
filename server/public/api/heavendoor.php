@@ -27,46 +27,31 @@ use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot,Op
  * operationhistoryに関わるバッチ
  * 
  */
-class OperationBatch{
-    private History $history_tbl;
-    private OperationHistory $oph_tbl;
-    public function __construct(OperationHistory $oph_tbl,History $history_tbl) {
-        $this->history_tbl = $history_tbl;
-        $this->oph_tbl=$oph_tbl;
-    }
-    /**
-     * 操作履歴を投入するバッチ
-     * @param string $method
-     * @param mixed $operation
-     * @return void
-     */
-    public function insertOperationSet(AccountBondEndpoint $endpoint,string $method,mixed $operation){
-        $tbl_rec=$this->history_tbl->insert(
-            $endpoint->accepted_time,
-            $endpoint->account->id,
-            $endpoint->stamp->stamp,
-            0xffffffff);
-        $this->oph_tbl->insert($tbl_rec->id,$method,$operation);
-    }
-    public function copyToPropertyTable(PropertiesTable $tbl){
-        $tbl->upsert(PropertiesTable::VNAME_GOD,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_GOD)->operationAsJson());
-        $tbl->upsert(PropertiesTable::VNAME_POW_ALGORITHM,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_POW_ALGORITHM)->operation);
-        $tbl->upsert(PropertiesTable::VNAME_SERVER_NAME,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_SERVER_NAME)->operationAsJson());
-        $tbl->upsert(PropertiesTable::VNAME_WELCOME,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_WELCOME)->operationAsJson()?1:0);
-        $tbl->upsert(PropertiesTable::VNAME_JSON_SCHEMA,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_SCHEMA)->operationAsJson());
-        $tbl->upsert(PropertiesTable::VNAME_JSON_JCS,$this->oph_tbl->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_JCS)->operationAsJson()?1:0);
+function insertOperationSets(History $history_tbl,OperationHistory $oph_tbl,AccountBondEndpoint $endpoint,array $method_operation){
+    $tbl_rec=$history_tbl->insert(
+        $endpoint->accepted_time,
+        $endpoint->account->id,
+        $endpoint->stamp->stamp,
+        0x0000ffffffffffff);
+    for($i= 0;$i<count($method_operation);$i++){
+        $oph_tbl->insert($tbl_rec->id,$method_operation[$i][0],$method_operation[$i][1]);
     }
 }
 
 
 /**
  * プロパティ変更後の同期
- * @param OperationBatch $opb
  * @param Jsonpost\db\tables\nst2024\PropertiesTable $tbl_properties
  * @return SuccessResultResponseBuilder
  */
-function finish(OperationBatch $opb,PropertiesTable $tbl_properties){
-    $opb->copyToPropertyTable($tbl_properties);//操作履歴を反映
+function finish(OperationHistory $oph,PropertiesTable $tbl_properties){
+    $tbl_properties->upsert(PropertiesTable::VNAME_GOD,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_GOD)->operationAsJson());
+    $tbl_properties->upsert(PropertiesTable::VNAME_POW_ALGORITHM,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_POW_ALGORITHM)->operation);
+    $tbl_properties->upsert(PropertiesTable::VNAME_SERVER_NAME,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_SERVER_NAME)->operationAsJson());
+    $tbl_properties->upsert(PropertiesTable::VNAME_WELCOME,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_WELCOME)->operationAsJson()?1:0);
+    $tbl_properties->upsert(PropertiesTable::VNAME_JSON_SCHEMA,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_SCHEMA)->operationAsJson());
+    $tbl_properties->upsert(PropertiesTable::VNAME_JSON_JCS,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_JCS)->operationAsJson()?1:0);
+
     $latest_property=$tbl_properties->selectAllAsObject();
     return new SuccessResultResponseBuilder(
         [
@@ -128,7 +113,7 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     //welcome デフォルト値有
     $welcome=$params[PropertiesTable::VNAME_WELCOME]??false;
     if(!is_bool($welcome)){
-        ErrorResponseBuilder::throwResponse(302,'welcome must be boolean.');
+        ErrorResponseBuilder::throwResponse(303,'welcome must be boolean.');
     }
     //json_schema デフォルト値有
     $json_schema=$params[PropertiesTable::VNAME_JSON_SCHEMA]??null;
@@ -139,7 +124,7 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     //json_jcs デフォルト値有
     $json_jcs=$params[PropertiesTable::VNAME_JSON_JCS]??false;
     if(!is_bool($json_jcs)){
-        ErrorResponseBuilder::throwResponse(302,'json_jcs must be boolean.');
+        ErrorResponseBuilder::throwResponse(303,'json_jcs must be boolean.');
     }
 
 
@@ -172,23 +157,21 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     //エンドポイントの生成（仮登録してgodエンドポイントで実行したほうがいいかもね
     $endpoint=ZeroNonceEndpoint::create($db,$server_name,$rawData);    
     $pubkey_hex=bin2hex($endpoint->stamp->getEcdsaPubkey());
-
-
-    #操作履歴を追加
-    $opb=new OperationBatch($tbl_operation_history,$tbl_history);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_GOD,$pubkey_hex);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_SERVER_NAME,$server_name);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_WELCOME,$welcome);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_JSON_JCS,$json_jcs);
-    $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_JSON_SCHEMA,$json_schema);
-    // #デバック用
-    // $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
-
     
+    #操作履歴を追加
     $tbl_properties->upsert(PropertiesTable::VNAME_VERSION,Config::VERSION);
     $tbl_properties->upsert(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME,0);     //ルートのPOWリクエスト受理時刻
-    return finish($opb,$tbl_properties);
+
+    insertOperationSets($tbl_history,$tbl_operation_history,$endpoint,[
+        [OperationHistory::METHOD_SET_GOD,$pubkey_hex],
+        [OperationHistory::METHOD_SET_SERVER_NAME,$server_name],
+        [OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack()],
+        [OperationHistory::METHOD_SET_WELCOME,$welcome],
+        [OperationHistory::METHOD_SET_JSON_JCS,$json_jcs],
+        [OperationHistory::METHOD_SET_JSON_SCHEMA,$json_schema],
+    ]);
+
+    return finish($tbl_operation_history,$tbl_properties);
 }
 
 function setparams($db,string $rawData): IResponseBuilder
@@ -217,14 +200,16 @@ function setparams($db,string $rawData): IResponseBuilder
     $tbl_operation_history=new OperationHistory($db);
     $tbl_history=(new History($db));
     $tbl_properties=(new PropertiesTable($db));
-    $opb=new OperationBatch($tbl_operation_history,$tbl_history);
+    // $opb=new OperationBatch($tbl_operation_history,$tbl_history);
+    $oplist=[];
+
 
     //アルゴリズムの再設定
     $algorithm_name=$params[PropertiesTable::VNAME_POW_ALGORITHM] ??null;
     if($algorithm_name){
         try{
             $pow_algorithm=TimeSizeDifficultyBuilder::fromText($algorithm_name);
-            $opb->insertOperationSet($endpoint,OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack());
+            array_push($oplist,[OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack()]);
         }catch(ErrorResponseBuilder $e){
             throw $e;
         }catch(Exception $e){
@@ -234,31 +219,35 @@ function setparams($db,string $rawData): IResponseBuilder
     //サーバーの再設定
     if (array_key_exists(PropertiesTable::VNAME_SERVER_NAME, $params)) {
         $server_name = $params[PropertiesTable::VNAME_SERVER_NAME];
-        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_SERVER_NAME, $server_name);
+        array_push($oplist,[OperationHistory::METHOD_SET_SERVER_NAME, $server_name]);
     }
     //Welcomeの再設定
     if (array_key_exists(PropertiesTable::VNAME_WELCOME, $params)) {
         $welcome = $params[PropertiesTable::VNAME_WELCOME];
         if(!is_bool($welcome)){
-            ErrorResponseBuilder::throwResponse(103);
+            ErrorResponseBuilder::throwResponse(303);
         }
-        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_WELCOME, $welcome);
+        array_push($oplist,[ OperationHistory::METHOD_SET_WELCOME, $welcome]);
     }
 
     //json_schema デフォルト値有
     if (array_key_exists(PropertiesTable::VNAME_JSON_SCHEMA, $params)) {
         $p=$params[PropertiesTable::VNAME_JSON_SCHEMA];
         $v=$p==null?null:json_encode($p,JSON_UNESCAPED_UNICODE);
-        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_JSON_SCHEMA, $v);
+        array_push($oplist,[ OperationHistory::METHOD_SET_JSON_SCHEMA, $v]);
         //ここでバリデーションチェックかけると完璧
     }
     //json_jcs デフォルト値有
     if (array_key_exists(PropertiesTable::VNAME_JSON_JCS, $params)) {
         $v = $params[PropertiesTable::VNAME_JSON_JCS];
-        $opb->insertOperationSet($endpoint, OperationHistory::METHOD_SET_JSON_JCS, $v);
+        if(!is_bool($v)){
+            ErrorResponseBuilder::throwResponse(303,'json_jcs must be boolean.');
+        }        
+        array_push($oplist,[OperationHistory::METHOD_SET_JSON_JCS, $v]);
     }
-
-    return finish($opb,$tbl_properties);
+    insertOperationSets($tbl_history,$tbl_operation_history,$endpoint,$oplist);
+  
+    return finish($tbl_operation_history,$tbl_properties);
 }
 
 
