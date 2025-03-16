@@ -6,6 +6,7 @@ import json
 import struct
 import math
 import datetime
+import hashlib
 from dataclasses import dataclass, field,replace
 from typing import ClassVar,Optional,List,Callable
 
@@ -43,20 +44,30 @@ class PerformanceTimer(object):
 
 
 class JconpostStampedApi:
-    def __init__(self,endpoint:str,pk:bytes|None,nonce:int=0,server_name:None|str=None,verbose:bool=False):
+    ZERO_HASH=b'\0'*32
+    NONCE_MAX=0x0000ffffffffffff
+    def __init__(self,endpoint:str,pk:bytes|None,chain_nonce:int=0,chain_hash:bytes=None,verbose:bool=False):
         self.endpoint=endpoint
         self.pk=pk
-        self.nocne=nonce
-        self.server_name=server_name
+        self.chain_nonce=chain_nonce
+        self.chain_hash=chain_hash
         self.verbose=verbose
 
     def status(self,with_update:bool=True)->requests.Response:
+        """
+        アカウント未登録の場合
+            →chain-hashは
+        アカウント登録済みの場合
+            →chain-hashはmain
+
+
+        """
         headers = {
             "Content-Type": "application/json; charset=utf-8"
         }
         if self.pk is not None:
             psb=PowStamp2Builder(self.pk)
-            ps=psb.createStamp(0,self.server_name)
+            ps=psb.createStamp(0,JconpostStampedApi.ZERO_HASH)
             headers["PowStamp-2"]=ps.stamp.hex()
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.endpoint}/status.php"
@@ -67,10 +78,8 @@ class JconpostStampedApi:
             try:
                 j=response.json()
                 if j["success"]:
-                    self.server_name=j["result"]["server_name"]
-                    a=j["result"]["account"]
-                    if a is not None:
-                        self.nonce=a["nonce"]
+                    self.chain_hash=j["result"]["chain"]["latest_hash"]
+                    self.chain_nonce=j["result"]["chain"]["nonce"]
             except json.JSONDecodeError:
                 pass
         return response
@@ -82,10 +91,19 @@ class JconpostStampedApi:
         ...
 
 
-    def godKonnichiwa(self,pow_algolithm:str,server_name:str|None,welcome:bool,json_jcs:bool,json_schema_fpath:str|None)->requests.Response:
+    def godKonnichiwa(self,seed_hash:bytes,pow_algolithm:str,welcome:bool,json_jcs:bool,json_schema_fpath:str|None)->requests.Response:
         """ konnichiwaを実行する。
+        @params pow_algolithm
+        @params welcome
+        @params json_jcs
+        @params json_schema_fpath
+
+        chain_nonceはgenesisとして使われる。
+        
         """
         assert(self.pk is not None)
+        assert(self.chain_hash is None)
+        assert(self.chain_nonce==0)
         json_schema=None
         if json_schema_fpath is not None:
             with open(json_schema_fpath,'r',encoding='utf-8') as fp:
@@ -94,7 +112,7 @@ class JconpostStampedApi:
             "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
             "params":{
                 "pow_algorithm":pow_algolithm,
-                "server_name":server_name, #OP
+                "seed_hash":seed_hash.hex(), #OP
                 "welcome":welcome, #OP
                 'json_jcs':json_jcs,#OP
                 'json_schema':json_schema #OP
@@ -104,7 +122,7 @@ class JconpostStampedApi:
         
         #スタンプの生成
         psb=PowStamp2Builder(self.pk)
-        ps=psb.createStamp(0,server_name,d_json)        
+        ps=psb.createStamp(0,seed_hash,d_json)        
         
         headers = {
             "Content-Type": "application/json; charset=utf-8",
@@ -118,7 +136,7 @@ class JconpostStampedApi:
 
         return requests.post(ep, data=d_json, headers=headers)
 
-    def godSetParams(self,pow_algolithm:str|None,server_name:str|None,welcome:bool,json_jcs:bool,json_schema_fpath:str|None)->requests.Response:
+    def godSetParams(self,pow_algolithm:str|None,welcome:bool,json_jcs:bool,json_schema_fpath:str|None)->requests.Response:
         """ setParamSetを実行する。
             必要なパラメータだけを設定する事。
             json_schemaだけは特殊。""の場合無効化して、Noneの場合は無視する。
@@ -127,8 +145,6 @@ class JconpostStampedApi:
         params={}
         if pow_algolithm is not None:
             params['pow_algorithm']=pow_algolithm
-        if server_name is not None:
-            params['server_name']=server_name
         if welcome is not None:
             params['welcome']=welcome
         if json_jcs is not None:
@@ -149,7 +165,7 @@ class JconpostStampedApi:
         d_json=json.dumps(data, ensure_ascii=False).encode('utf-8')
         #スタンプの生成
         psb=PowStamp2Builder(self.pk)
-        ps=psb.createStamp(0,self.server_name,d_json)        
+        ps=psb.createStamp(self.chain_nonce,self.chain_hash,d_json)        
         # ヘッダーの指定（charset=utf-8を指定）
         headers = {
             "Content-Type": "application/json; charset=utf-8",
@@ -164,9 +180,9 @@ class JconpostStampedApi:
     def upload(self,payload:str,timeout:float=2,retry:int=3,print_progress:bool=True)->requests.Response:
         target_score=0
         psb=PowStamp2Builder(self.pk)
-        psg=psb.createStampMessageGenerator(self.nocne+1,self.server_name,payload)
+        psg=psb.createStampMessageGenerator(self.chain_nonce+1,self.chain_hash,payload)
         response=None
-        best=0xffffffff
+        best=self.NONCE_MAX
         best_ps=None
         if print_progress: print(f"Start hasing: target={target_score}")
         for i in range(retry):
@@ -198,7 +214,8 @@ class JconpostStampedApi:
             try:
                 j=response.json()            
                 if j["success"]:
-                    self.nocne=j["result"]["account"]["nonce"]
+                    self.chain_nonce=j["result"]["chain"]["nonce"]
+                    self.chain_hash=j["result"]["chain"]["latest_hash"]
                     #成功
                     return response
                 else:
@@ -214,6 +231,7 @@ class JconpostStampedApi:
                 break
         #失敗お
         return response
+
 
 
 
@@ -253,15 +271,13 @@ def str_to_bool(value: str) -> bool:
 class JsonpostCl:
     DEFAULT_CONFIG_NAME='./jsonpost.cfg.json'
 
-
-
     @dataclass(frozen=True)
     class AppConfig:
         VERSION: ClassVar[str] = "nyatla.jp:jsonpostcl:config:1"  # ClassVarで固定値
         created_date: datetime.datetime
         private_key: bytes
         params_nonce:int
-        params_server_name:Optional[str]
+        params_hash:bytes
 
         @classmethod
         def create(cls) -> "JsonpostCl.AppConfig":
@@ -272,7 +288,7 @@ class JsonpostCl:
                 created_date=datetime.datetime.now(datetime.timezone.utc),
                 private_key=private_key,
                 params_nonce=0,
-                params_server_name=None)
+                params_hash=b'\0'*32)
 
         @classmethod
         def load(cls, config_file: str) -> "JsonpostCl.AppConfig":
@@ -283,8 +299,8 @@ class JsonpostCl:
                 return cls(
                     created_date=datetime.datetime.strptime(config['created_at'], '%Y-%m-%dT%H:%M:%S%z'),  # タイムゾーン情報を含む
                     private_key=bytes.fromhex(config['private_key']),
-                    params_server_name=config['params']['server_name'],
-                    params_nonce=config['params']['nonce']
+                    params_nonce=config['params']['nonce'],
+                    params_hash=bytes.fromhex(config['params']['hash']),
                 )
 
         def save(self, fname: str):
@@ -294,8 +310,8 @@ class JsonpostCl:
                 "private_key": self.private_key.hex(),
                 "created_at": self.created_date.strftime('%Y-%m-%dT%H:%M:%S%z'),  # タイムゾーン付きで保存
                 "params":{
-                    "server_name":self.params_server_name,
                     "nonce":self.params_nonce,
+                    "hash":self.params_hash.hex(),
                 },
             }
             with open(fname, 'w') as f:
@@ -303,8 +319,10 @@ class JsonpostCl:
         
         def setNonce(self,nonce:int)->"JsonpostCl.AppConfig":
             return replace(self, params_nonce=nonce)
-        def setServerName(self,server_name:Optional[str])->"JsonpostCl.AppConfig":
-            return replace(self, params_server_name=server_name)
+        def setHash(self,hash:bytes)->"JsonpostCl.AppConfig":
+            return replace(self, params_hash=hash)
+
+
 
     class CommandBase:
         def __init__(self, args):
@@ -379,29 +397,13 @@ class JsonpostCl:
             api=JconpostStampedApi(
                 self.args.endpoint,
                 config.private_key,
-                nonce=config.params_nonce+1 if self.args.nonce is None else self.args.nonce,#現在の値+1で設定
-                server_name=config.params_server_name if self.args.server_name is None else self.args.server_name)
+                chain_nonce=config.params_nonce+1 if self.args.nonce is None else self.args.nonce,#現在の値+1で設定
+                chain_hash=config.params_hash)
 
             def hasher_callback(msg:str):
                 print(msg)
             ret=api.upload(data,self.args.timeout,self.args.rounds,hasher_callback)
-            # if self.args.verbose:
-            #     print("Upload data :")
-            #     print(f"X-PowStamp :",espow.stamp.hex())
-            #     print(f"HASH :",espow.hash.hex())
-            #     print("JSON :")
-            #     print(data.decode())
 
-
-                # # ハッシュ処理
-                # espow = config.generatePoWStamp(self.args.nonce,self.args.server_name ,data,powtarget)            
-                # pownonce = espow.powNonceAsInt  # ハッシュ値（または結果）
-                # elapsed_time=pf.elapseInMs
-                # # ハッシュレートを計算 (ハッシュ数/秒)
-                # hash_rate = pownonce / elapsed_time if elapsed_time > 0 else 0
-                # # 結果をプリント
-                # # print(espow.powbits,espow.sha256d.hex())                
-                # print(f"accepted: {espow.powScore32}/{pownonce} ({espow.powScore32*100/(32-math.log2(powtarget)):.2f}%) {round(hash_rate)}hash/s (yay!!!)")
 
 
             fmt=ResponseFormatter(ret)
@@ -409,7 +411,8 @@ class JsonpostCl:
             #ここから先は返却値がおかしければエラーでるよ
             j=ret.json()
             if j["success"]:
-                config=config.setNonce(j["result"]["account"]["nonce"])
+                c=j["result"]["chain"]
+                config=config.setNonce(c["nonce"]).setHash(bytes.fromhex(c["latest_hash"]))
                 #configの更新
                 print(f"Config file updated.")
                 config.save(self.args.config)            
@@ -429,7 +432,6 @@ class JsonpostCl:
             group.add_argument("-F", "--filename", type=str, help="The filename to upload")
             group.add_argument("-J", "--json", type=str, help="JSON string to upload")
             upload_parser.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
-            upload_parser.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
             upload_parser.add_argument("-N","--nonce", type=int, required=False, default=None, help="The nonce for the upload")
             upload_parser.add_argument("--normalize", type=str, choices=['raw','jcs','json'],required=False, default='jcs', help="Formatting before sending.")
             upload_parser.add_argument("--timeout", type=float, default=5.0,required=False, help="Hashing timeout per each round in second.")
@@ -447,15 +449,20 @@ class JsonpostCl:
             # 設定ファイルの読み込み
             config = JsonpostCl.AppConfig.load(self.args.config)
 
+            #genesisの生成
+            genesis=os.urandom(32)
+            if self.args.server_seed is not  None:
+                genesis=hashlib.sha256(self.args.server_seed).digest()   
+
+
             api=JconpostStampedApi(
                 self.args.endpoint,
-                config.private_key,
-                server_name=self.args.server_name)
+                config.private_key)
             # # アップロード先のエンドポイントに対してPOSTリクエストを送信
             # ep=f"{self.args.endpoint}/heavendoor.php?konnichiwa"
             ret=api.godKonnichiwa(
+                genesis,
                 self.args.pow_algorithm,
-                self.args.server_name,
                 self.args.welcome,
                 self.args.json_jcs,
                 self.args.json_schema
@@ -465,7 +472,7 @@ class JsonpostCl:
             #ここから先は返却値がおかしければエラーでるよ
             j=ret.json()
             if j["success"]:
-                config=config.setServerName(j["result"]["server_name"]).setNonce(0)
+                config=config.setNonce(0).setHash(bytes.fromhex(j["result"]["chain"]["genesis_hash"]))
                 #configの更新
                 print(f"Config file updated.")
                 config.save(self.args.config)
@@ -475,7 +482,7 @@ class JsonpostCl:
             # upload コマンドの後に指定されるデータ
             sp.add_argument("endpoint", type=str, help="The endpoint to upload the file to")
             sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
-            sp.add_argument("-S","--server-name", default=None, type=str, help="New server domain name. default=None(public)")
+            sp.add_argument("-S","--server-seed", default=None, type=str, help="New server domain name. default=urandom32")
             sp.add_argument("--pow-algorithm", type=str, required=False, default='["tlsln",[10,16,0.8]]', help="Pow difficulty detection algorithm.")
             sp.add_argument("--welcome", type=str_to_bool, required=False, default=None, help="Accept new accounts.['true','false','0','1','yes','no']")
             sp.add_argument("--json-jcs", type=str_to_bool, required=False, default=None, help="Accept JCS format only.['true','false','0','1','yes','no']")
@@ -490,12 +497,12 @@ class JsonpostCl:
             api=JconpostStampedApi(
                 self.args.endpoint,
                 config.private_key,
-                server_name=config.params_server_name)
+                chain_nonce=config.params_nonce,
+                chain_hash=config.params_hash)
             # # アップロード先のエンドポイントに対してPOSTリクエストを送信
             # ep=f"{self.args.endpoint}/heavendoor.php?konnichiwa"
             ret=api.godSetParams(
                 self.args.pow_algorithm,
-                self.args.server_name,
                 self.args.welcome,
                 self.args.json_jcs,
                 "" if self.args.json_no_schema else self.args.json_schema #無効の場合はNone,指定があればそれを指定。
@@ -541,7 +548,7 @@ class JsonpostCl:
             api=JconpostStampedApi(
                 self.args.endpoint,
                 config.private_key if self.args.account else None,
-                server_name=config.params_server_name if self.args.server_name is None else self.args.server_name,
+                chain_hash=None,
                 verbose=verbose)
 
             ret=api.status(with_update=False)
@@ -551,10 +558,9 @@ class JsonpostCl:
             #ここから先は返却値がおかしければエラーでるよ
             j=ret.json()
             if j["success"] and self.args.upgrade:
-                config=config.setServerName(j["result"]["settings"]["server_name"])
-                a=j["result"]["account"]
-                if a is not None:
-                    config=config.setNonce(a["nonce"])
+                c=j["result"]["chain"]
+                if c is not None:
+                    config=config.setNonce(c["nonce"]).setHash(bytes.fromhex(c["latest_hash"]))
                 print(f"Config file updated.")
                 #configの更新
                 config.save(self.args.config)
@@ -564,7 +570,6 @@ class JsonpostCl:
             sp = subparsers.add_parser("status", help="Display status and upgrade local confuration.")
             sp.add_argument("endpoint", type=str, help="The base URL endpoint for status API")
             sp.add_argument("-C","--config", nargs='?', type=str, default=JsonpostCl.DEFAULT_CONFIG_NAME, help="The file of client configuration.")
-            sp.add_argument("-S","--server-name", default=None, type=str, help="Temporary override server name. default=None(public)")
             sp.add_argument("-A","--account", action="store_true", help="Enable account infomation.")
             sp.add_argument("-U","--upgrade", action="store_true", help="Updates the configuration file to match the server. Use -A to also update the account information.")
             sp.add_argument("--verbose", action="store_true", help="Display the JSON data being uploaded.")

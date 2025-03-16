@@ -46,8 +46,8 @@ class PropertiesTable
 {
     public const TABLE_NAME='properties';
     public const VNAME_POW_ALGORITHM='pow_algorithm';
-    public const VNAME_SERVER_NAME='server_name';
-    public const VNAME_ROOT_POW_ACCEPT_TIME='root.pow_accept_time';
+    public const VNAME_SEED_HASH='seed_hash';
+
     public const VNAME_VERSION='version';
     public const VNAME_GOD='god';
     public const VNAME_WELCOME='welcome';
@@ -77,6 +77,18 @@ class PropertiesTable
         $this->db->exec($sql);
         return $this;
     }
+
+    public function insert(string $name, ?string $value)
+    {
+        $insertSql = "INSERT INTO {$this->name} (name, value) VALUES (:name, :value);";
+        $stmt = $this->db->prepare($insertSql);
+        $stmt->bindValue(':name', $name, PDO::PARAM_STR);
+        $stmt->bindValue(':value', $value, PDO::PARAM_STR);
+        
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to insert param '{$name}'");
+        }
+    }    
     public function upsert(string $name, ?string $value)
     {
         // まず、既存のレコードをUPDATE
@@ -88,14 +100,7 @@ class PropertiesTable
     
         // もしUPDATEで何も更新されなかった場合、INSERT
         if ($stmt->rowCount() === 0) {
-            $insertSql = "INSERT INTO {$this->name} (name, value) VALUES (:name, :value);";
-            $stmt = $this->db->prepare($insertSql);
-            $stmt->bindValue(':name', $name, PDO::PARAM_STR);
-            $stmt->bindValue(':value', $value, PDO::PARAM_STR);
-            
-            if (!$stmt->execute()) {
-                throw new Exception("Failed to insert param '{$name}'");
-            }
+            $this->insert($name,$value);
         }
     }
     public function selectByNameAsBool(string $name): bool{

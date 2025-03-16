@@ -1,6 +1,7 @@
 <?php
 
 use Jsonpost\endpoint\GodEndpoint;
+use Jsonpost\utils\ecdsasigner\PowStamp2;
 
 
 require dirname(__FILE__) .'/../../vendor/autoload.php'; // Composerでインストールしたライブラリを読み込む
@@ -17,11 +18,31 @@ use Jsonpost\utils\pow\TimeSizeDifficultyBuilder;
 use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\endpoint\{ZeroNonceEndpoint,AccountBondEndpoint};
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
-use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot,OperationHistory};
+use Jsonpost\db\tables\{JsonStorageHistory,JsonStorage,EcdasSignedAccountRoot,OperationHistory,HistoryRecord};
 
 
 
-
+class NodeFormatter{
+    /**
+     * Pow成功時の結果通知ノード
+     * @param string $chain
+     * @param string $hash
+     * @param int $accept_nonce
+     * @param int $require_nonce
+     * @return array{domain: string, latest_hash: string, nonce: array{accept: int, required: int}}
+     */
+    public static function pow(string $chain,string $hash,int $accept_score,int $require_score,int $nonce){
+        return [
+            "chainId"=>$chain,#chainIDはアカウントIDと同じ
+            "score"=>[
+                "required"=>$require_score,
+                "accept"=>$accept_score,
+            ],
+            "latest_hash"=>$hash,
+            "latest_nonce"=>$nonce
+        ];
+    }
+}
 
 /**
  * operationhistoryに関わるバッチ
@@ -44,26 +65,23 @@ function insertOperationSets(History $history_tbl,OperationHistory $oph_tbl,Acco
  * @param Jsonpost\db\tables\nst2024\PropertiesTable $tbl_properties
  * @return SuccessResultResponseBuilder
  */
-function finish(OperationHistory $oph,PropertiesTable $tbl_properties){
+function getPropertiesSet(OperationHistory $oph,PropertiesTable $tbl_properties):array{
     $tbl_properties->upsert(PropertiesTable::VNAME_GOD,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_GOD)->operationAsJson());
     $tbl_properties->upsert(PropertiesTable::VNAME_POW_ALGORITHM,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_POW_ALGORITHM)->operation);
-    $tbl_properties->upsert(PropertiesTable::VNAME_SERVER_NAME,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_SERVER_NAME)->operationAsJson());
     $tbl_properties->upsert(PropertiesTable::VNAME_WELCOME,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_WELCOME)->operationAsJson()?1:0);
     $tbl_properties->upsert(PropertiesTable::VNAME_JSON_SCHEMA,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_SCHEMA)->operationAsJson());
     $tbl_properties->upsert(PropertiesTable::VNAME_JSON_JCS,$oph->getLatestByMethod(method: OperationHistory::METHOD_SET_JSON_JCS)->operationAsJson()?1:0);
 
     $latest_property=$tbl_properties->selectAllAsObject();
-    return new SuccessResultResponseBuilder(
-        [
-            PropertiesTable::VNAME_WELCOME=>$latest_property->welcome,
-            PropertiesTable::VNAME_GOD=>$latest_property->god,
-            PropertiesTable::VNAME_SERVER_NAME=>$latest_property->server_name,
-            PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
-            PropertiesTable::VNAME_JSON_SCHEMA=>json_decode($latest_property->json_schema),
-            PropertiesTable::VNAME_JSON_JCS=>$latest_property->json_jcs
-        ]
-    );
+    return [
+        PropertiesTable::VNAME_WELCOME=>$latest_property->welcome,
+        PropertiesTable::VNAME_GOD=>$latest_property->god,
+        PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
+        PropertiesTable::VNAME_JSON_SCHEMA=>json_decode($latest_property->json_schema),
+        PropertiesTable::VNAME_JSON_JCS=>$latest_property->json_jcs
+    ];    
 }
+
 
 
 /**
@@ -75,6 +93,15 @@ function finish(OperationHistory $oph,PropertiesTable $tbl_properties){
  */
 function konnichiwa($db,string $rawData): IResponseBuilder
 {
+    // テーブルがすでに存在するかを確認
+    $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
+    $result = $db->query($checkSql);
+    
+    // properties テーブルが存在しない場合、初期化を実行
+    if ($result->fetch()) {
+        ErrorResponseBuilder::throwResponse(501);
+    }
+
     //JSONペイロードの評価
     $request = json_decode($rawData, true);
     if ($request === null) {
@@ -85,7 +112,7 @@ function konnichiwa($db,string $rawData): IResponseBuilder
             ErrorResponseBuilder::throwResponse(302,"Parameter $.$v not found.");
         }
     } 
-    foreach([PropertiesTable::VNAME_SERVER_NAME,PropertiesTable::VNAME_POW_ALGORITHM]as $v){
+    foreach([PropertiesTable::VNAME_SEED_HASH,PropertiesTable::VNAME_POW_ALGORITHM]as $v){
         if(!array_key_exists($v,$request['params'])){
             ErrorResponseBuilder::throwResponse(302,"Parameter $.params.$v not found.");
         }
@@ -96,20 +123,21 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     }
     //パラメタ
     $params=$request['params'];
-    //サーバー名(null可)
-    $server_name=$params[PropertiesTable::VNAME_SERVER_NAME]??null;
+    //Genesis
+    $seed_hash=$params[PropertiesTable::VNAME_SEED_HASH];
+    if (strlen($seed_hash) !== 64 || !ctype_xdigit($seed_hash)) {
+        ErrorResponseBuilder::throwResponse(303,"Invalid genesis hash: must be a 64-character hexadecimal string.");
+    }    
 
     //pow_algolithm
-    $algorithm_name=$params[PropertiesTable::VNAME_POW_ALGORITHM] ??null;
-    if(!$algorithm_name){
-        ErrorResponseBuilder::throwResponse(302,'Pow algorithm not set.');
-    }
+    $algorithm_name=$params[PropertiesTable::VNAME_POW_ALGORITHM];
     $pow_algorithm=null;
     try{
         $pow_algorithm=TimeSizeDifficultyBuilder::fromText($algorithm_name);
     }catch(Exception $e){
         ErrorResponseBuilder::throwResponse(303,"Unknown algorihm '$algorithm_name'");
     }
+
     //welcome デフォルト値有
     $welcome=$params[PropertiesTable::VNAME_WELCOME]??false;
     if(!is_bool($welcome)){
@@ -129,14 +157,7 @@ function konnichiwa($db,string $rawData): IResponseBuilder
 
 
 
-    // テーブルがすでに存在するかを確認
-    $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
-    $result = $db->query($checkSql);
-    
-    // properties テーブルが存在しない場合、初期化を実行
-    if ($result->fetch()) {
-        ErrorResponseBuilder::throwResponse(501);
-    }
+
     //テーブルの生成
     $tbl_properties=(new PropertiesTable($db))->createTable();
     $tb_dbspec=(new DbSpecTable($db))->createTable();
@@ -153,25 +174,33 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     $tb_dbspec->insert(History::VERSION,$tbl_history->name);
     $tb_dbspec->insert(OperationHistory::VERSION,$tbl_operation_history->name);
 
-    
+
+
     //エンドポイントの生成（仮登録してgodエンドポイントで実行したほうがいいかもね
-    $endpoint=ZeroNonceEndpoint::create($db,$server_name,$rawData);    
+    $endpoint=ZeroNonceEndpoint::create($db,hex2bin($seed_hash),$rawData);    
     $pubkey_hex=bin2hex($endpoint->stamp->getEcdsaPubkey());
     
     #操作履歴を追加
     $tbl_properties->upsert(PropertiesTable::VNAME_VERSION,Config::VERSION);
-    $tbl_properties->upsert(PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME,0);     //ルートのPOWリクエスト受理時刻
+    $tbl_properties->upsert(PropertiesTable::VNAME_SEED_HASH,$seed_hash);
 
     insertOperationSets($tbl_history,$tbl_operation_history,$endpoint,[
         [OperationHistory::METHOD_SET_GOD,$pubkey_hex],
-        [OperationHistory::METHOD_SET_SERVER_NAME,$server_name],
         [OperationHistory::METHOD_SET_POW_ALGORITHM,$pow_algorithm->pack()],
         [OperationHistory::METHOD_SET_WELCOME,$welcome],
         [OperationHistory::METHOD_SET_JSON_JCS,$json_jcs],
         [OperationHistory::METHOD_SET_JSON_SCHEMA,$json_schema],
     ]);
-
-    return finish($tbl_operation_history,$tbl_properties);
+    $rec=HistoryRecord::selectLatestAccountFirstHistory($db);
+    $ps=$rec->powstampAsObject();
+    return new SuccessResultResponseBuilder(
+        [
+            "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
+            "chain"=>[
+                "genesis_hash"=>bin2hex($ps->getHash())
+            ]
+        ]
+    );
 }
 
 function setparams($db,string $rawData): IResponseBuilder
@@ -216,11 +245,6 @@ function setparams($db,string $rawData): IResponseBuilder
             ErrorResponseBuilder::throwResponse(103,"Unknown algorihm '$algorithm_name'");
         }
     }
-    //サーバーの再設定
-    if (array_key_exists(PropertiesTable::VNAME_SERVER_NAME, $params)) {
-        $server_name = $params[PropertiesTable::VNAME_SERVER_NAME];
-        array_push($oplist,[OperationHistory::METHOD_SET_SERVER_NAME, $server_name]);
-    }
     //Welcomeの再設定
     if (array_key_exists(PropertiesTable::VNAME_WELCOME, $params)) {
         $welcome = $params[PropertiesTable::VNAME_WELCOME];
@@ -246,8 +270,21 @@ function setparams($db,string $rawData): IResponseBuilder
         array_push($oplist,[OperationHistory::METHOD_SET_JSON_JCS, $v]);
     }
     insertOperationSets($tbl_history,$tbl_operation_history,$endpoint,$oplist);
-  
-    return finish($tbl_operation_history,$tbl_properties);
+
+    $rec=HistoryRecord::selectLatestAccountFirstHistory($db);
+    $ps=$rec->powstampAsObject();
+    //スタンプ変わってないよね
+    assert($ps->getNonceAsU48()==$endpoint->stamp->getNonceAsU48());
+
+    return new SuccessResultResponseBuilder(
+        [
+            "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
+            "chain"=>[
+                "latest_hash"=>bin2hex($ps->getHash()),
+                "nonce"=>$ps->getNonceAsU48(),
+            ]
+        ]
+    );
 }
 
 

@@ -2,40 +2,47 @@
 namespace Jsonpost\endpoint;
 
 
+use Jsonpost\db\tables\EcdasSignedAccountRootRecord;
 use Jsonpost\db\tables\nst2024\{PropertiesTable,DbSpecTable};
-use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
+use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory,HistoryRecord};
 
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
+use Jsonpost\utils\ecdsasigner\PowStamp2;
 
 
 
 
 /**
  * GodOperationのエンドポイント。
- * このエンドポイントはGodアカウントが操作を行うためのNonceを消費しないEndpointです。
+ * このエンドポイントはGodアカウントが操作を行うため、Nonceを消費しませんが、ハッシュチェーンは進行します。
+ * 
  */
 class GodEndpoint extends AccountBondEndpoint
 {
     public static function create($db,?string $rawData):GodEndpoint{
         $pt=new PropertiesTable($db);
-        $server_name=$pt->selectByName(PropertiesTable::VNAME_SERVER_NAME);
-        $stamp=parent::createStamp($server_name,$rawData);
-        $ar_tbl=new EcdasSignedAccountRoot($db);
-        $ar_ret=$ar_tbl->select($stamp->getEcdsaPubkey());
-        if($ar_ret===false){
-            ErrorResponseBuilder::throwResponse(401,hint:[]);
+        //Godのhashを引く
+        $god_pubkey=hex2bin($pt->selectByName(PropertiesTable::VNAME_GOD));
+        $ar_rec=EcdasSignedAccountRootRecord::selectAccountByPubkey($db,$god_pubkey);
+        if($ar_rec===false){
+            ErrorResponseBuilder::throwResponse(206,);
         }
-        $pt=new PropertiesTable($db);
-        if($pt->selectByName(PropertiesTable::VNAME_GOD)!=$ar_ret->pubkeyAsHex()){
-            ErrorResponseBuilder::throwResponse(206,hint:[]);
+        $god_rec=HistoryRecord::selectLatestHistoryByAccount($db,$god_pubkey);
+        if($god_rec===false){
+            ErrorResponseBuilder::throwResponse(401);//神がいない
         }
-
+        $god_stamp=$god_rec->powstampAsObject();
+        //GodのLatestHashでStampを構成できる？
+        $stamp=PowStamp2::createVerifiedFromHeader($god_stamp->getHash(),$rawData);
+        //Nonceは更新されていない？
+        if($stamp->getNonceAsU48()!=$god_stamp->getNonceAsU48()){
+            ErrorResponseBuilder::throwResponse(204,hint:["current"=>$god_stamp->getNonceAsU48()]);
+        }
         return new GodEndpoint(
-                parent::getMsNow(),
-                $stamp,
+            $stamp,
                 $db,
                 $pt,
-                $ar_ret,0xffffffff
+                $ar_rec,self::UINT48_MAX
         );
     }
 }

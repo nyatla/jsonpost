@@ -13,8 +13,9 @@
 ### 必要なPowStamp
 このAPIは、[`PowStamp`](../../powstamp.md) の付与が必須です。
 
-- **nonce**: `0` を指定してください。
-- **payload**: リクエストボディの内容です。
+- **Nonce**: `0` を指定してください。
+- **ServerChainHash**: seed_hashを指定します。
+- **PayloadHash**: リクエストボディのハッシュです。
 - **pow**: ハッシングは不要です。
 
 ### リクエストフォーマット
@@ -27,7 +28,7 @@ Content-Type: application/json
 {
     "version": "urn::nyatla.jp:json-request::jsonpost-konnichiwa:1",
     "params":{
-        "server_name":null,
+        "seed_hash":"0000000000000000000000000000000000000000000000000000000000000000",
         "pow_algorithm":["tlsln",[10,16,0.8]],
         "welcome":true,
         "json_schema":null,
@@ -38,9 +39,8 @@ Content-Type: application/json
 
 ### パラメータ説明
 
-- **server_name**  
-    サーバーのドメイン名として登録します。  以降のPowStamp生成時に必要になります。  
-    同名サーバー間では認証情報を共有できます。
+- **seed_hash**  
+    主チェーンを構成するためのハッシュ値です。安全な乱数であることが必要です。PowStampはこのハッシュ値を使って生成してください。
 - **pow_algorithm**  
     サーバーが使用するPoW閾値決定アルゴリズムを指定します。`tnsln` のみ指定可能です。  
     - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
@@ -61,13 +61,31 @@ Content-Type: application/json
 
 ```json
 {
-    "success":true,
-    "result":{
-        "welcome":false,
-        "god":"03edd86f79bd656847f74ad5071e2b6c59d5aaa57c7ca9391a6559bee2a97a04df","server_name":null,
-        "pow_algorithm":["tlsln",[10,16,0.8]],
-        "json_schema":null,
-        "json_jcs":false
+    "success": true,
+    "result": {
+        "genesis_hash": "57ca6c4c15bf786e924521f8c73bef41eda03b9c24ab6dbe9bafb7f761849963",
+        "welcome": false,
+        "god": "0261747ab20b08b19fbfcc53941a7ef312d969b4d2c95c8bedc2be4ea86977d324",
+        "pow_algorithm": [
+            "tlsln",
+            [
+                10,
+                16,
+                0.8
+            ]
+        ],
+        "json_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "number"
+                }
+            }
+        },
+        "json_jcs": true
     }
 }
 ```
@@ -79,6 +97,8 @@ Content-Type: application/json
 
 - **result**  
     結果を格納します。
+    - **genesis_hash**
+        ハッシュチェーンの開始ハッシュ値です。この値はsha256(PowStamp)と同じです。
     - **god**  
         登録された管理者の公開鍵です。
     - **その他**  
@@ -97,8 +117,9 @@ Content-Type: application/json
 ### 必要なPowStamp
 このAPIは、GODアドレスの[`PowStamp`](../../powstamp.md) の付与が必須です。
 
-- **nonce**: `0` を指定してください。
-- **payload**: リクエストボディの内容です。
+- **Nonce**: `0` を指定してください。
+- **ServerChainHash**: genesis_hashを指定します。
+- **PayloadHash**: リクエストボディのハッシュです。
 - **pow**: ハッシングは不要です。
 
 ### リクエストフォーマット
@@ -112,7 +133,6 @@ Content-Type: application/json
     "version": "urn::nyatla.jp:json-request::jsonpost-setparams:1",
     "params":{
         "pow_algorithm":["tlsln",[10,16,0.8]],
-        "server_name":null,
         "welcome":false,
         "json_schema":null,
         "json_jcs":false        

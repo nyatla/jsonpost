@@ -46,10 +46,13 @@ Content-Type: application/json
         "account": {
             "status": "new",
             "user_uuid": "01955010-e2b8-718e-942f-5b8d5f7404cb",
-            "nonce": 10
         },
+        "chain": {
+            "domain": "blanch",
+            "latest_hash": "bf97792bd9f416e1de6e58c6a46873c043d8bb3485eb0cd83c0372b596d5fd0d",
+            "nonce": 0
+        },        
         "pow": {
-            "domain": "root",
             "required": 127656310,
             "accepted": 98254575
         }
@@ -57,8 +60,8 @@ Content-Type: application/json
 }
 ```
 
-リクエストが成功すると、必要に応じてuuidが割り当てられ、accountのnonceがPowNonceの値+1に更新されます。  
-nonceが`0xffffffff`になると、それ以降の操作はできなくなるため注意してください。
+リクエストが成功すると、必要に応じてuuidが割り当てられ、accountのnonceがPowNonceの値に更新されます。  
+nonceが`0xffffffffffff`になると、それ以降の操作はできなくなるため注意してください。
 
 ### フィールド説明
 

@@ -42,7 +42,7 @@ class PowStamp2Message {
         $padded = "\x00\x00" . substr($hash, 0, 6);
         return unpack('J', $padded)[1];        
     }
-    public static function create(string $pubkey, string $nonce, ?string $serverDomainHash = null, ?string $payloadHash = null): self {
+    public static function create(string $pubkey, string $nonce, ?string $chain_hash=null, ?string $payloadHash = null): self {
         
         if (strlen($pubkey) !== 33) {
             throw new Exception("Invalid pubkey length");
@@ -52,7 +52,7 @@ class PowStamp2Message {
         }
         
         $b = $pubkey . $nonce;
-        $b .= $serverDomainHash ? $serverDomainHash : str_repeat("\x00", 32);
+        $b .= $chain_hash? $chain_hash : str_repeat("\x00", times: 32);
         $b .= $payloadHash ? $payloadHash : str_repeat("\x00", times: 32);
         
         return new self($b);

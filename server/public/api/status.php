@@ -1,5 +1,10 @@
 <?php
 
+
+
+
+
+
 /**
  * POWSTAMPがある場合はaccountの情報も得られる。
  */
@@ -14,11 +19,10 @@ use Jsonpost\Config;
 
 
 
-use Jsonpost\endpoint\AccountEndpoint;
-use Jsonpost\responsebuilder\{IResponseBuilder,ErrorResponseBuilder,SuccessResultResponseBuilder};
+use Jsonpost\endpoint\{VerifiedStampEndpoint};
+use Jsonpost\responsebuilder\{ErrorResponseBuilder,SuccessResultResponseBuilder};
 use Jsonpost\db\tables\nst2024\{PropertiesTable};
-use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory};
-use Jsonpost\db\batch\{HistoryBatch};
+use Jsonpost\db\tables\{EcdasSignedAccountRootRecord,HistoryRecord};
 
 
 
@@ -30,39 +34,63 @@ try{
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         ErrorResponseBuilder::throwResponse(err_code: 101,status:405);
     }
-    $prop_tbl=new PropertiesTable($db);
-    $properties=$prop_tbl->selectAllAsObject();
-    $account_block=null;
+
+    $chain_json=null;
+    $account_json=null;
     if(isset($_SERVER['HTTP_POWSTAMP_2'])){
         //スタンプがついてたらaccountの情報も取る
-        $endpoint=AccountEndpoint::create($db,null);
-        #ここに段階右折してるから後で直して
-        $act=new EcdasSignedAccountRoot($db);
-        $act_rec=$act->selectAccountByPubkey($endpoint->stamp->getEcdsaPubkey());
-        #historyとjsonStorageHistoryをくっつけて
+        $endpoint=VerifiedStampEndpoint::create();
+        $act_rec=EcdasSignedAccountRootRecord::selectAccountByPubkey($db,$endpoint->stamp->getEcdsaPubkey());
+        if($act_rec!==false){
+            $account_json=[
+                'uuid'=>$act_rec->uuidAsText(),
+            ];
 
-        $hb=new HistoryBatch($db);
-        $hrec=$hb->selectLatestStorageHistoryByAccount($act_rec->id);
-        if($hrec===false){
-            //Historyがない
-            $account_block=[
-                'uuid'=>$act_rec->uuidAsText(),
-                'latest_pow_time'=>0,
-                'nonce'=>$act_rec->nonce
-            ];
+            $hrec=HistoryRecord::selectLatestHistoryByAccount($db,$act_rec->id);
+            if($hrec!==false){
+                //PowStampのアカウントが存在し、かつフォークを済ませている。
+                $pstamp=$hrec->powstampAsObject();
+                $chain_json=[
+                    'domain'=>'blanch',
+                    'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
+                    'nonce'=>$pstamp->getNonceAsU48()
+                ];
+            }else{
+                //フォークしてるけどHistoryにはない。
+                ErrorResponseBuilder::throwResponse(101,message:'This pass is not considerd.',status:405);
+            }
         }else{
-            $account_block=[
-                'uuid'=>$act_rec->uuidAsText(),
-                'latest_pow_time'=>$hrec->timestamp,
-                'nonce'=>$act_rec->nonce
-            ];
+            //新規アカウントっぽい。ハッシュは最後に登録されたアカウントの初めのHistoryを得る
+            $hrec=HistoryRecord::selectLatestAccountFirstHistory($db);
+            if($hrec===false){
+                ErrorResponseBuilder::throwResponse(101,message:'This pass is not considerd.',status:405);
+            }
+            $pstamp=$hrec->powstampAsObject();
+            $chain_json=[
+                'domain'=>'main',
+                'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
+                'nonce'=>$pstamp->getNonceAsU48()
+        ];
         }
+    }else{
+            //新規アカウントっぽい。ハッシュは最後に登録されたアカウントの初めのHistoryを得る
+            $hrec=HistoryRecord::selectLatestAccountFirstHistory($db);
+            if($hrec===false){
+                ErrorResponseBuilder::throwResponse(101,message:'This pass is not considerd.',status:405);
+            }
+            $pstamp=$hrec->powstampAsObject();
+            $chain_json=[
+                'domain'=>'main',
+                'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
+                'nonce'=>$pstamp->getNonceAsU48()
+            ];
     }
+    $prop_tbl=new PropertiesTable($db);
+    $properties=$prop_tbl->selectAllAsObject();    
     $r=[
         'settings'=>[
             'version'=>$properties->version,
             // 'god'=>$properties->god!=$properties->god?null:$properties->god,
-            'server_name'=>$properties->server_name,
             'pow_algorithm'=>$properties->pow_algorithm->pack(),
             'welcome'=>$properties->welcome,
             'json'=>[
@@ -70,10 +98,8 @@ try{
                 'schema'=>json_decode($properties->json_schema)
             ]
         ],
-        'root'=>[
-            'latest_pow_time'=>$properties->root_pow_accept_time,
-        ],
-        'account'=>$account_block
+        'chain'=>$chain_json,
+        'account'=>$account_json
     ];
     (new SuccessResultResponseBuilder($r))->sendResponse();
 }catch(ErrorResponseBuilder $exception){

@@ -54,15 +54,14 @@ ECDSA署名のK値は固定するべきではありません。これはPoWStamp
 |------------------|------------|---------------------------------|
 | EcdsaPublicKey   | 33         | プレフィクス付きECDSA公開鍵                |
 | Nonce            | 6          | メッセージNonce(BigEndian)                 |
-| ServerDomainHash | 32         | サーバー名のSHA256ハッシュ               |
+| ServerChainHash | 32         | サーバーが提示した現在のSHA256ハッシュ               |
 | PayloadHash      | 32         | 送信ペイロードのSHA256ハッシュ            |
 | **total**        | **103**    | 合計バイト数                            |
 
 - EcdsaPublicKey  
     クライアントが所有するECDSA秘密鍵から生成します。
-- ServerDomainHash  
-    サーバーから提供されるドメイン名のSHA256ハッシュです。
-    Publicサーバーの場合は `sha256(0[32])` を指定します。
+- ServerChainHash  
+    サーバーから提供されるSHA256ハッシュです。
 - PayloadHash  
     クライアントが準備する情報で、PowStampと共に送信されるペイロードのSHA256ハッシュ値です。
     ペイロードを持たない場合は `sha256(0[32])` を指定します。

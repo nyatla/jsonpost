@@ -20,7 +20,7 @@ class PropertiesRows {
      * @var object
      */
     public ITimeSizeDifficultyProvider $pow_algorithm;
-    public ?string $server_name;
+    public string $seed_hex;
     public int $root_pow_accept_time;
 
     public function __construct(array $data) {
@@ -32,8 +32,7 @@ class PropertiesRows {
         $this->version = $a[PropertiesTable::VNAME_VERSION];
         $this->god = $a[PropertiesTable::VNAME_GOD];
         $this->pow_algorithm =TimeSizeDifficultyBuilder::fromText($a[PropertiesTable::VNAME_POW_ALGORITHM]);
-        $this->server_name = $a[PropertiesTable::VNAME_SERVER_NAME];
-        $this->root_pow_accept_time =  (int)$a[PropertiesTable::VNAME_ROOT_POW_ACCEPT_TIME];
+        $this->seed_hex = $a[PropertiesTable::VNAME_SEED_HASH];
         $this->welcome =  ((int)$a[PropertiesTable::VNAME_WELCOME])>0?true:false;
         $this->json_schema =  $a[PropertiesTable::VNAME_JSON_SCHEMA];
         $this->json_jcs =  ((int)$a[PropertiesTable::VNAME_JSON_JCS])>0?true:false;

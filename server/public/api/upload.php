@@ -134,10 +134,9 @@ function upload($db,$rawData):IResponseBuilder
     $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->stamp,$endpoint->required_pow);
     $jsh_rec=$jsh_table->insert($hs_rec->id,$js_rec->id);    
     //アップデートのバッチ処理/
+    
 
-
-    $endpoint->commitStamp();
-
+    
     return new SuccessResultResponseBuilder(
         [
         'document'=>[
@@ -147,10 +146,13 @@ function upload($db,$rawData):IResponseBuilder
         'account'=>[
             'status'=>$ar_rec->is_new_record?'new':'exist',
             'user_uuid'=>$ar_rec->uuidAsText(),
-            'nonce'=>$endpoint->next_nonce,    
+        ],
+        "chain"=>[
+            "domain"=>"blanch",//これは固定
+            "latest_hash"=>bin2hex($endpoint->stamp->getHash()),
+            'nonce'=>$endpoint->stamp->getNonceAsU48(),    
         ],
         'pow'=>[
-            'domain'=>$ar_rec->is_new_record?'root':'account',
             'required'=>$endpoint->required_pow,
             'accepted'=>$endpoint->accepted_pow
         ]

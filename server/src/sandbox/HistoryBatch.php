@@ -41,6 +41,44 @@ class HistoryBatch{
 
         return $stmt->fetchObject('Jsonpost\db\tables\HistoryRecord');
 
-        //存在しない場合はnull
     }
+    public function selectLatestHistoryByAccount($account_id):HistoryRecord|false
+    {
+        $sql="
+            SELECT *
+            FROM history
+            WHERE id_account = :account_id
+            ORDER BY id DESC
+            LIMIT 1;
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':account_id', $account_id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchObject('Jsonpost\db\tables\HistoryRecord');
+    }
+    public function selectLatestAccountFirstHistory():HistoryRecord
+    {
+        $sql="
+            WITH filtered_history AS (
+                SELECT h.*
+                FROM history h
+                INNER JOIN json_storage_history jsh
+                    ON h.id = jsh.id_history
+            )
+            SELECT *
+            FROM filtered_history
+            WHERE id_account = :account_id
+            ORDER BY id DESC
+            LIMIT 1;
+        ";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':account_id', $account_id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchObject('Jsonpost\db\tables\HistoryRecord');
+
+    }
+
+
 }

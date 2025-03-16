@@ -27,22 +27,19 @@ class PowStamp2Message:
         return self.message[33:33+6]
     
     @property
-    def serverDomainHash(self)->bytes:
+    def chainHash(self)->bytes:
         return self.message[33+6:33+6+32]
     @property
     def payloadHash(self)->bytes:
         return self.message[33+6+32:33+6+32+32]
     @classmethod
-    def create(cls,pubkey:bytes,nonce:bytes,server_domain_hash:Optional[bytes]=None,payload_hash:Optional[bytes]=None):
+    def create(cls,pubkey:bytes,nonce:bytes,chain_hash:bytes,payload_hash:Optional[bytes]=None):
         assert(len(pubkey)==33)
         assert(len(nonce)==6)
         b=pubkey+nonce
         # print("s",server_domain_hash)
         # print("p",payload_hash.hex())
-        if server_domain_hash is not None:
-            b+=server_domain_hash
-        else:
-            b+= b'\x00' * 32
+        b+=chain_hash
         if payload_hash is not None:
             b+=payload_hash
         else:
@@ -82,20 +79,20 @@ class PowStamp2:
     def ecdsaPubkey(self)->bytes:
         return self.stamp[64:64+33]
 
-    def recoverMessage(self,server_domain:Optional[str]=None,payload:Optional[bytes]=None):
+    def recoverMessage(self,chain_hash:bytes,payload:Optional[bytes]=None):
         """ server_domain,payloadを加えてMessageを復帰する。
         """
         return PowStamp2Message.create(
             self.ecdsaPubkey,
             self.nonce,
-            None if server_domain is None else hashlib.sha256(server_domain.encode()).digest(),
+            chain_hash,
             None if payload is None else hashlib.sha256(payload).digest()            
         )    
 
 
     @classmethod
-    def verify(cls,stamp:"PowStamp2",server_domain:Optional[str]=None,payload:Optional[bytes]=None)->bool:
-        psm=stamp.recoverMessage(server_domain,payload)
+    def verify(cls,stamp:"PowStamp2",chain_hash:bytes,payload:Optional[bytes]=None)->bool:
+        psm=stamp.recoverMessage(chain_hash,payload)
         return EcdsaSignner.verify(
             stamp.powStampSignature,
             psm.message,
@@ -109,26 +106,27 @@ class PowStamp2Builder:
     def __init__(self,pk:bytes):
         self.es=EcdsaSignner(pk)
 
-    def createStampMessageGenerator(self, nonce_start: int, server_domain: Optional[str] = None, payload: Optional[bytes] = None) -> Generator[PowStamp2Message, None, None]:
+    def createStampMessageGenerator(self, nonce_start: int, chain_hash: bytes, payload: Optional[bytes] = None) -> Generator[PowStamp2Message, None, None]:
         """ハッシング結果を返すgeneratorです
         """
+        assert(len(chain_hash)==32)
         es=self.es
         pubkey=EcdsaSignner.compressPubKey(es.public_key)
         for i in range(nonce_start,self.MAX_NONCE):
             yield PowStamp2Message.create(
                 pubkey,
                 struct.pack('>Q', i)[2:8],#48bit
-                None if server_domain is None else hashlib.sha256(server_domain.encode()).digest(),
+                chain_hash,
                 None if payload is None else hashlib.sha256(payload).digest()
             )
         raise Exception("Nonce overflow.")
     
-    def createStamp(self,nonce_start:int,server_domain:Optional[str]=None,payload:Optional[bytes]=None,target_score:Optional[int]=None) -> PowStamp2:
+    def createStamp(self,nonce_start:int,chain_hash:bytes,payload:Optional[bytes]=None,target_score:Optional[int]=None) -> PowStamp2:
         """ target_scoreを満たすPowをハッシングして返す。
         """
         es=self.es
         spubkey=EcdsaSignner.compressPubKey(es.public_key)
-        for message in self.createStampMessageGenerator(nonce_start,server_domain,payload):
+        for message in self.createStampMessageGenerator(nonce_start,chain_hash,payload):
             if target_score is None or message.powScoreU48<=target_score:
                 return PowStamp2(es.sign(message.message)+spubkey+message.nonce)
         raise ValueError(f"Failed to find a valid PoW nonce for target_score={target_score}")

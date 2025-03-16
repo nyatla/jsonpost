@@ -16,7 +16,7 @@ assert(PowStamp2.verify(ps))
 ps=psb.createStamp(2,server_domain="localhost",payload=b"testtttt",target_score=0x000000ffffffffff)
 print(ps.nonceAsU48)
 assert(ps.ecdsaPubkey==EcdsaSignner.compressPubKey(psb.es.public_key))
-assert(PowStamp2.verify(ps,server_domain="localhost",payload=b"testtttt"))
+assert(PowStamp2.verify(ps,chain_hash="localhost",payload=b"testtttt"))
 rm=ps.recoverMessage(server_domain="localhost",payload=b"testtttt")
 print(rm.payloadHash.hex(),rm.powScoreU48)
 
@@ -28,4 +28,4 @@ ps=PowStamp2(ps.stamp[0:64+33]+b'\0'*8+ps.stamp[64+33+8:])
 print(ps.nonceAsU48)
 # assert(ps.nonceAsInt==0)
 assert(ps.ecdsaPubkey==EcdsaSignner.compressPubKey(psb.es.public_key))
-assert(PowStamp2.verify(ps,server_domain="localhost",payload=b"testtttt"))#NGOK
+assert(PowStamp2.verify(ps,chain_hash="localhost",payload=b"testtttt"))#NGOK

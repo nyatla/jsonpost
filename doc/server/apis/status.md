@@ -33,10 +33,12 @@ GET /status.php
                 "schema":{"type":"object","properties":{"name":{"type":"string"},"level":{"type":"number"}}}
             }
         },
-        "root":{
-            "latest_pow_time":0
+        "chain": {
+            "domain": "main",
+            "latest_hash": "bf97792bd9f416e1de6e58c6a46873c043d8bb3485eb0cd83c0372b596d5fd0d",
+            "nonce": 0
         },
-        "account":null
+        "account": null
     }
 }
 ```
@@ -54,8 +56,8 @@ GET /status.php
     サーバーのバージョンです。
     - **その他**
     現在の設定値です。
-  - **root**  
-    アカウント共通の情報を格納します。
+  - **chain**  
+    未登録アカウントがアクセス可能なチェーンハッシュの情報を格納します。
     - **latest_pow_time**  
     pow計算に使用される起点時刻[ms-unix-time]です。
   - **account**  
@@ -93,7 +95,6 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
     "result":{
         "settings":{
             "version":"nyatla.jp:jsonpost:1",
-            "server_name":null,
             "pow_algorithm":[
                 "tlsln",[5,0.1,3.8]
             ],
@@ -103,13 +104,13 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
                 "schema":{"type":"object","properties":{"name":{"type":"string"},"level":{"type":"number"}}}
             }
         },
-        "root":{
-            "latest_pow_time":0
+        "chain": {
+            "domain": "blanch",
+            "latest_hash": "bf97792bd9f416e1de6e58c6a46873c043d8bb3485eb0cd83c0372b596d5fd0d",
+            "nonce": 0
         },
-        "account":{
-            "uuid":"01956fd7-d887-7183-ae85-ed42af19b9ec",
-            "latest_pow_time":1741348218457,
-            "nonce":0
+        "account": {
+            "uuid": "01959990-cc38-7217-af39-a1c7bee2ac31"
         }
     }
 }
@@ -121,16 +122,13 @@ statusのPowStampは署名機能のみを利用し、以下のパラメータで
     処理結果。`true`の場合は成功、`false`の場合は失敗です。
   - **result**  
     Powなしと同一です。
-  - **root**  
+  - **chain**  
     Powなしと同一です。
   - **account**  
     PowStampで識別されたアカウントの情報を格納します。
     - **uuid**  
         アカウントのUUIDです。
-    - **latest_pow_time**  
-        アカウントごとのpow計算に使用される起点時刻[ms-unix-time]です。
-    - **latest_pow_time**  
-        現在のnonce値です。
+
 
 ---
 

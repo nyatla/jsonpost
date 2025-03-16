@@ -35,9 +35,8 @@ class AccountEndpoint extends AccountBondEndpoint
         $server_name=$pt->selectByName(PropertiesTable::VNAME_SERVER_NAME);
         $accepted_time=parent::getMsNow();
         $stamp=parent::createStamp($server_name, $rawData);
-        $ar_tbl=new EcdasSignedAccountRoot($db);
 
-        $ar_ret=$ar_tbl->select($stamp->getEcdsaPubkey());
+        $ar_ret=EcdasSignedAccountRootRecord::select($db,$stamp->getEcdsaPubkey());
         if($ar_ret===false){
             ErrorResponseBuilder::throwResponse(401);
         }

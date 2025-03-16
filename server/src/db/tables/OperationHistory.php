@@ -21,9 +21,9 @@ class OperationHistoryRecord{
 class OperationHistory
 {
     public const VERSION='OperationHistory:2';
+    public const METHOD_GENESIS='genesis';
     public const METHOD_SET_GOD='set.god';
     public const METHOD_SET_POW_ALGORITHM='set.pow_algorithm';
-    public const METHOD_SET_SERVER_NAME='set.server_name';
     public const METHOD_SET_WELCOME='set.welcome';
     public const METHOD_SET_JSON_SCHEMA='set.json_schema';
     public const METHOD_SET_JSON_JCS='set.json_jcs';
