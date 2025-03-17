@@ -271,17 +271,12 @@ function setparams($db,string $rawData): IResponseBuilder
     }
     insertOperationSets($tbl_history,$tbl_operation_history,$endpoint,$oplist);
 
-    $rec=HistoryRecord::selectLatestAccountFirstHistory($db);
-    $ps=$rec->powstampAsObject();
-    //スタンプ変わってないよね
-    assert($ps->getNonceAsU48()==$endpoint->stamp->getNonceAsU48());
-
     return new SuccessResultResponseBuilder(
         [
             "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
             "chain"=>[
-                "latest_hash"=>bin2hex($ps->getHash()),
-                "nonce"=>$ps->getNonceAsU48(),
+                "latest_hash"=>bin2hex($endpoint->stamp->getHash()),
+                "nonce"=>$endpoint->stamp->getNonceAsU48(),
             ]
         ]
     );

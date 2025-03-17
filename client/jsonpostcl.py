@@ -512,7 +512,8 @@ class JsonpostCl:
             #ここから先は返却値がおかしければエラーでるよ
             j=ret.json()
             if j["success"]:
-                config=config.setServerName(j["result"]["server_name"])
+                c=j["result"]["chain"]
+                config=config.setNonce(c["nonce"]).setHash(bytes.fromhex(c["latest_hash"]))
                 #configの更新
                 print(f"Config file updated.")
                 config.save(self.args.config)

@@ -148,7 +148,7 @@ function upload($db,$rawData):IResponseBuilder
             'user_uuid'=>$ar_rec->uuidAsText(),
         ],
         "chain"=>[
-            "domain"=>"blanch",//これは固定
+            "domain"=>"branch",//これは固定
             "latest_hash"=>bin2hex($endpoint->stamp->getHash()),
             'nonce'=>$endpoint->stamp->getNonceAsU48(),    
         ],
