@@ -51,7 +51,7 @@ try{
                 //PowStampのアカウントが存在し、かつフォークを済ませている。
                 $pstamp=$hrec->powstampAsObject();
                 $chain_json=[
-                    'domain'=>'blanch',
+                    'domain'=>'branch',
                     'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
                     'nonce'=>$pstamp->getNonceAsU48()
                 ];

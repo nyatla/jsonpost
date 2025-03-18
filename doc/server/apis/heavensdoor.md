@@ -1,17 +1,18 @@
 # /heavendoor API仕様
 
-`/heavendoor` は、サーバーの初期化と管理者公開鍵の登録を行うAPIです。
-
-このAPIを利用するには、`PowStamp` ヘッダーが必須です。
+`/heavendoor` は、サーバーの初期化とGod権限の操作APIです。
+このAPIを利用するには、`PowStamp2` ヘッダーが必須です。
 
 ## /heavendoor?konnichiwa
 
 未初期化状態のサーバーを初期化して、データベースを構築します。
+実行したアカウントをGodアカウントとして登録し、他に定義されているコマンドを独占して利用できるようにします。
 このAPIは **1度のみ実行可能** で、成功後は二度と使用できません。
 
 
 ### 必要なPowStamp
-このAPIは、[`PowStamp`](../../powstamp.md) の付与が必須です。
+このAPIは、[`PowStamp2`](../../powstamp2.md) の付与が必須です。
+
 
 - **Nonce**: `0` を指定してください。
 - **ServerChainHash**: seed_hashを指定します。
@@ -22,7 +23,7 @@
 
 ```http
 POST /heavendoor.php?konnichiwa HTTP/1.1
-PowStamp-1: <hex値>
+PowStamp-2: <hex値>
 Content-Type: application/json
 
 {
@@ -43,7 +44,7 @@ Content-Type: application/json
     主チェーンを構成するためのハッシュ値です。安全な乱数であることが必要です。PowStampはこのハッシュ値を使って生成してください。
 - **pow_algorithm**  
     サーバーが使用するPoW閾値決定アルゴリズムを指定します。`tnsln` のみ指定可能です。  
-    - 詳細は、[`閾値計算アルゴリズム`](../../powstamp.md#閾値計算アルゴリズム) を参照してください。  
+    - 詳細は、[`JsonPostのアクセス制御`](../../JsonPostのアクセス制御.md#TimeLogiticsSizeLogNormal方式) を参照してください。  
     - 上記例では、「アップロード間隔5秒」「JSONファイルサイズ16KB」を目標とした設定になっています。
 - **welcome**  
     (省略時:false)新規アカウントのアップロードと登録を受け付けるかを指定します。
@@ -51,7 +52,6 @@ Content-Type: application/json
     (省略時:null)JSON-Schemaでアップロード可能なJSONを制限する場合に指定します。指定可能なスキーマのバージョンはドラフト6、7です。
 - **json_jcs**  
     (省略時:false)アップロード可能なJSONをJCS準拠の物だけに制限するかのフラグです。
-
 
 ---
 
@@ -63,17 +63,17 @@ Content-Type: application/json
 {
     "success": true,
     "result": {
-        "genesis_hash": "57ca6c4c15bf786e924521f8c73bef41eda03b9c24ab6dbe9bafb7f761849963",
-        "welcome": false,
-        "god": "0261747ab20b08b19fbfcc53941a7ef312d969b4d2c95c8bedc2be4ea86977d324",
-        "pow_algorithm": [
-            "tlsln",
-            [
-                10,
-                16,
-                0.8
-            ]
-        ],
+        "properties": {
+            "welcome": false,
+            "god": "028cb4c857959aa7e319f849cd6dd2a59f264eefa066579dcaa3128d93bda0f4bb",
+            "pow_algorithm": [
+                "tlsln",
+                [
+                    1,
+                    0.01,
+                    3
+                ]
+            ],
         "json_schema": {
             "type": "object",
             "properties": {
@@ -86,28 +86,46 @@ Content-Type: application/json
             }
         },
         "json_jcs": true
+        },
+        "chain": {
+            "domain": "branch",
+            "latest_hash": "0a6981ac171836538199f7830d9e2c2ae5655661798b40d0551ea46418de3048",
+            "nonce": 0
+        }
     }
 }
 ```
 
-#### フィールド説明（リスト形式）
+#### フィールド説明
 
 - **success**  
     処理結果。`true`の場合は成功、`false`の場合は失敗です。
 
 - **result**  
     結果を格納します。
-    - **genesis_hash**
-        ハッシュチェーンの開始ハッシュ値です。この値はsha256(PowStamp)と同じです。
     - **god**  
         登録された管理者の公開鍵です。
+    - **chain**
+      - **latest_hash**
+          アカウントの現在のハッシュチェーンの値です。この値はsha256(PowStamp)と同じです。
+      - **nonce**
+          アカウントの現在のNonce値です。
     - **その他**  
         設定した値です。  
+
+
+
+
 ---
+
+
 
 #### 失敗時
 
 エラーが発生した場合は、[`エラーコード`](./errorcodes.md) を参照してください。
+
+
+---
 
 ## /heavendoor?setparams
 
@@ -115,10 +133,10 @@ Content-Type: application/json
 
 
 ### 必要なPowStamp
-このAPIは、GODアドレスの[`PowStamp`](../../powstamp.md) の付与が必須です。
+このAPIは、GODアドレスの[`PowStamp2`](../../powstamp2.md) の付与が必須です。
 
 - **Nonce**: `0` を指定してください。
-- **ServerChainHash**: genesis_hashを指定します。
+- **ServerChainHash**: Godアカウントのハッシュチェーンを指定します。
 - **PayloadHash**: リクエストボディのハッシュです。
 - **pow**: ハッシングは不要です。
 
@@ -126,7 +144,7 @@ Content-Type: application/json
 
 ```http
 POST /heavendoor.php?setparams HTTP/1.1
-PowStamp-1: <hex値>
+PowStamp-2: <hex値>
 Content-Type: application/json
 
 {
@@ -151,5 +169,31 @@ paramsには、変更するパラメータのみ指定してください。
 
 ### レスポンス仕様
 
-詳細は?konnichiwaと同一です。
+konnichiwaと同一です。
 
+```json
+{
+    "success": true,
+    "result": {
+        "properties": {
+            "welcome": false,
+            "god": "028cb4c857959aa7e319f849cd6dd2a59f264eefa066579dcaa3128d93bda0f4bb",
+            "pow_algorithm": [
+                "tlsln",
+                [
+                    1,
+                    0.01,
+                    3
+                ]
+            ],
+            "json_schema": null,
+            "json_jcs": false
+        },
+        "chain": {
+            "domain": "branch",
+            "latest_hash": "492424dfc7b5f4ce70188afa231cb94c4f13a16dd7cdc4715068d330a4806c4e",
+            "nonce": 0
+        }
+    }
+}
+```

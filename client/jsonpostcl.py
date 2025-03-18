@@ -133,8 +133,17 @@ class JconpostStampedApi:
 
         # アップロード先のエンドポイントに対してPOSTリクエストを送信
         ep=f"{self.endpoint}/heavendoor.php?konnichiwa"
-
-        return requests.post(ep, data=d_json, headers=headers)
+        response = requests.post(ep, data=d_json, headers=headers)
+        try:
+            j=response.json()            
+            if j["success"]:
+                self.chain_nonce=j["result"]["chain"]["nonce"]
+                self.chain_hash=j["result"]["chain"]["latest_hash"]
+                #成功
+                return response
+        except json.JSONDecodeError:
+            pass
+        return response
 
     def godSetParams(self,pow_algolithm:str|None,welcome:bool,json_jcs:bool,json_schema_fpath:str|None)->requests.Response:
         """ setParamSetを実行する。
@@ -472,7 +481,8 @@ class JsonpostCl:
             #ここから先は返却値がおかしければエラーでるよ
             j=ret.json()
             if j["success"]:
-                config=config.setNonce(0).setHash(bytes.fromhex(j["result"]["chain"]["genesis_hash"]))
+                c=j["result"]["chain"]
+                config=config.setNonce(c["nonce"]).setHash(bytes.fromhex(c["latest_hash"]))
                 #configの更新
                 print(f"Config file updated.")
                 config.save(self.args.config)

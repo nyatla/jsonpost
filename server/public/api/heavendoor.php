@@ -197,8 +197,10 @@ function konnichiwa($db,string $rawData): IResponseBuilder
         [
             "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
             "chain"=>[
-                "genesis_hash"=>bin2hex($ps->getHash())
-            ]
+                "domain"=>"branch",
+                "latest_hash"=>bin2hex($ps->getHash()),
+                "nonce"=>$ps->getNonceAsU48(),
+            ]            
         ]
     );
 }
@@ -275,6 +277,7 @@ function setparams($db,string $rawData): IResponseBuilder
         [
             "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
             "chain"=>[
+                "domain"=>"branch",
                 "latest_hash"=>bin2hex($endpoint->stamp->getHash()),
                 "nonce"=>$endpoint->stamp->getNonceAsU48(),
             ]

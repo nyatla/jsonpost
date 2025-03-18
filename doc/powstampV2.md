@@ -11,6 +11,7 @@ PowStampV2では、V1のPowNonceとNonceを統合します。
 - PowStampから.PowNonceを削除し、Nonceのバイト長を8に拡大
 - PowStampのスコア値算定方式を変更。
 - これに伴いハッシング対象をPowStampからPowStampMessageに変更
+- ServerNameをServerChainHashに変更
 
 
 これらにより、データ形式の単純化、処理方式の明確化、対応ハッシュレートの拡大などの効果を見込みます。
@@ -61,30 +62,27 @@ ECDSA署名のK値は固定するべきではありません。これはPoWStamp
 - EcdsaPublicKey  
     クライアントが所有するECDSA秘密鍵から生成します。
 - ServerChainHash  
-    サーバーから提供されるSHA256ハッシュです。
+    サーバーから提供されるSHA256ハッシュです。このハッシュは、サーバーがその時点で有効な値を提示します。
+    この値の決定方法はサーバの実装に委ねます。
 - PayloadHash  
     クライアントが準備する情報で、PowStampと共に送信されるペイロードのSHA256ハッシュ値です。
     ペイロードを持たない場合は `sha256(0[32])` を指定します。
 - Nonce  
     Nonceはサーバにより受け入れ下限が提示され、クライアントによりその範囲から選択される値です。
     初期値は0であり、クライアントは常にサーバの提示する値よりも大きい値を選択しなければなりません。  
-    受け入れ下限の最大値は0x0000ffffffffffffです。これ以上の値は存在しないため、サーバの提示値がこの値に到達した時点で、そのPowStampは生成不能になります。
+    この値はPowStampを生成したクライアントの寿命としての側面があります。最大値0x0000ffffffffffff以上の値は存在しないため、サーバの提示値がこの値に到達した時点で、そのPowStampを構成するEcdsaPublicKeyは終端になります。  
 
 
 ## PowStampのスコア
 
 `sha256d(PowStampMessage)` の結果の先頭48ビットを `big-endian UINT` として解釈した値がスコア値です。
-サーバーはこの値を閾値と比較し、閾値未満であれば有効なPowStampとして受理します。
-
 スコア値は、値が低いほど出現率が低くなる性質があります。
-サーバーはこの値に閾値を設定し、PosStampに演算コストを要求します。
 
 ### 閾値
 
-サーバが使用するPowStampスコアの閾値m(m>0)は、[0,0x0000ffffffffffff]の範囲にある値です。
-閾値はPowStampのスコアの有効/無効を決定するための値で、閾値未満の値を有効とすることで、
+閾値は、サーバが提示する値で、[0,0x0000ffffffffffff]の範囲にある値です。
+サーバーはこの値を閾値と比較し、閾値未満であれば有効なPowStampとして受理します。
 
-(m-1)/(0x0000ffffffffffff)の確率で有効なPowStampを得ることができるようになります。
 
 ### スコアのビジュアライズ
 
@@ -93,22 +91,6 @@ ECDSA署名のK値は固定するべきではありません。これはPoWStamp
 ```
 rate=log2(score)/32
 ```
-
-
-### ハッシング
-
-目的のスコアを持つPowStampを得るには、PowStampのPowNonceフィールドの値を変更しながらsha256dの結果を評価するプロセスを繰り返します。目標をtarget_scoreとすると、以下の疑似コードで表現されます。これは確率的な探索になります。
-
-hash_baseはPowStampのPowNonceを除く101バイトです。
-
-<!-- ```
-for i in range(0x0000ffffffffffff):
-    pw=sha256(sha256(hash_base+struct.pack('>Q', i)))
-    if unpack('>I', pw[0:4])[0]>target_score:
-        return pw
-``` -->
-
-
 
 
 
@@ -131,68 +113,54 @@ PowStamp-2: 1afe01c478b26b091e28568e921ba72fdfd253f0400deed94f482e9825113071034f
 
 
 
-## 参考
-
-PowStampとPowStampMessageの生成例です。
-
-k値がランダムの為、署名の値は生成毎に異なります。
-
-<!-- ```
-import os,sys
-import hashlib
-import struct
-from libs.powstamp import PowStamp,PowStampMessage
-from libs.ecdsa_utils import EcdsaSignner
-pk = b'0'*32
-nonce = 1
-server_domain = "TEST"
-payload = b"TEST"
-
-es=EcdsaSignner(pk)
-spubkey=EcdsaSignner.compressPubKey(es.public_key)
-sdhash=None if server_domain is None else hashlib.sha256(server_domain.encode()).digest()
-phash=None if payload is None else hashlib.sha256(payload).digest()
-
-sm=PowStampMessage.create(
-    spubkey,
-    struct.pack('>I', nonce),
-    sdhash,
-    phash,
-)
-hash_base=es.sign(sm.message)+spubkey+struct.pack('>I',nonce)
-pw=PowStamp(hash_base+struct.pack('>I', 0))
 
 
-print("**PowStampMessage**")
 
-print("EcdsaPublicKey",spubkey.hex())
-print("Nonce",sm.nonce.hex())
-print("ServerDomainHash",sdhash.hex())
-print("PayloadHash",phash.hex())
-print("Total",sm.message.hex())
 
-print("**PowStamp**")
-print("PowStampSignature",pw.powStampSignature.hex())
-print("EcdsaPublicKey",pw.ecdsaPubkey.hex())
-print("Nonce",pw.nonce.hex())
-print("PowNonce",pw.powNonce.hex())
-print("Total",pw.stamp.hex())
-```
 
-```
-**PowStampMessage**
-EcdsaPublicKey 022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f51277
-Nonce 00000001
-ServerDomainHash 94ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2
-PayloadHash 94ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2
-Total 022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f512770000000194ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc294ee059335e587e501cc4bf90613e0814f00a7b08bc7c648fd865a2af6a22cc2
-**PowStamp**
-PowStampSignature 83c9175403510b8fc7c25ba6f66b42b8e50a17d87f4824660f96ffa9f3bf99f92cd513f7b2cb88e527be81da21f11ce29f8c43d4a1568133984f520c0e4ad74e
-EcdsaPublicKey 022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f51277
-Nonce 00000001
-PowNonce 00000000
-Total 83c9175403510b8fc7c25ba6f66b42b8e50a17d87f4824660f96ffa9f3bf99f92cd513f7b2cb88e527be81da21f11ce29f8c43d4a1568133984f520c0e4ad74e022ed557f5ad336b31a49857e4e9664954ac33385aa20a93e2d64bfe7f08f512770000000100000000
 
-``` -->
+
+## PowStamp2を認証機能として使用する
+
+PowStamp2を認証キーとする使用例です。
+
+このモードは、クライアントにアクセス条件を付ける必要のない参照系リクエスト、管理権限リクエストで使用します。
+
+サーバはECDSA署名部分だけを使用してクライアントを識別し、認証します。
+認証されたクライアントはサーバに対して無制限に要求が可能です。
+
+PowStampMessageのNonce,ServerChainHash,PayloadHashは0フィルします。
+
+
+## PowStamp2をアクセス条件として使用する
+
+PowStamp2を認証キーとして、ServerChainHashで制限するリクエストです。
+
+このモードは、nonceを消費しないアクセス条件を付ける場合に使います。
+
+サーバはECDSA署名部分のほかに、ServerChainHashを条件としてクライアントを認証します。
+サーバがServerChainHashを提示することで、クライアントがその時点のリクエストを生成する事を条件付けることができます。
+Nonceは0フィルします。
+
+リプレイプロテクションが必要なリクエストにも利用できます。
+
+
+
+## PowStamp2をペナルティ付アクセス条件として使用する
+
+PowStamp2の本来の使途です。
+
+難易度に応じたペナルティをクライアントに与え、演算量と残存寿命からアクセス制御を試みるモードです。
+
+
+
+有効なPowStamp2をサーバに送信するには、以下の条件でPowStamp2のNonceを設定しなければなりません。
+
+- UINT32(sha256d(PowStampMessage(Nonce,ServerChainHash,...))[0:6])<サーバのスコア閾値
+- Nonce>サーバの提示したNonce値
+- ServerChainHash==サーバの提示したHash値
+
+この条件を満たすために、クライアントはNonceを変化させながらsha256dの結果を評価するプロセスを繰り返し、ハッシングを行います。
+
 
 

@@ -48,7 +48,7 @@ Content-Type: application/json
             "user_uuid": "01955010-e2b8-718e-942f-5b8d5f7404cb",
         },
         "chain": {
-            "domain": "blanch",
+            "domain": "branch",
             "latest_hash": "bf97792bd9f416e1de6e58c6a46873c043d8bb3485eb0cd83c0372b596d5fd0d",
             "nonce": 0
         },        
