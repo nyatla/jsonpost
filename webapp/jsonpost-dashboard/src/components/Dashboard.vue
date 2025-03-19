@@ -1,19 +1,21 @@
 <template>
     <div class="dashboard">
       <h1 class="title">JSONPOST ダッシュボード</h1>
-      <el-tabs v-model="activeTab" class="custom-tabs">
-        <el-tab-pane label="ステータス" name="status">
-          <StatusTab />
-        </el-tab-pane>
-        <el-tab-pane label="データ検索" name="search">
-          <ListTab />
-        </el-tab-pane>
-        <el-tab-pane label="統計情報" name="count">
-          <CountTab />
-        </el-tab-pane>
-        <el-tab-pane label="PowStamp クライアント" name="client">
-          <ClientDownloadTab />
-        </el-tab-pane>
+      <el-tabs v-model="activeTab" class="custom-tabs" tab-position="top">
+        <div class="tabs-center">
+          <el-tab-pane label="ステータス" name="status">
+            <StatusTab />
+          </el-tab-pane>
+          <el-tab-pane label="統計情報" name="count">
+            <CountTab />
+          </el-tab-pane>
+          <el-tab-pane label="データ検索" name="search">
+            <ListTab />
+          </el-tab-pane>
+          <el-tab-pane label="クライアントの入手" name="client">
+            <ClientDownloadTab />
+          </el-tab-pane>
+        </div>
       </el-tabs>
     </div>
   </template>
@@ -33,17 +35,33 @@
   <style lang="less">
   .dashboard {
     padding: 20px;
+    max-width: 1200px;
+    margin: auto;
+  
     .title {
       font-size: 28px;
       font-weight: bold;
       margin-bottom: 20px;
+      text-align: center;
     }
   }
   
   .custom-tabs {
+    .el-tabs__nav-wrap::after {
+      display: none;
+    }
+  
+    .el-tabs__nav {
+      display: flex;
+      justify-content: center;
+    }
+  
     .el-tabs__item {
-      padding: 10px 20px;
+      width: 160px;
+      text-align: center;
+      padding: 10px 0;
       font-size: 16px;
+      flex: none;
     }
   
     .el-tabs__item.is-active {
