@@ -5,10 +5,7 @@
         <el-tab-pane label="ステータス" name="status">
           <StatusTab />
         </el-tab-pane>
-        <el-tab-pane label="JSONPath検索" name="search">
-          <SearchTab />
-        </el-tab-pane>
-        <el-tab-pane label="リスト表示" name="list">
+        <el-tab-pane label="データ検索" name="search">
           <ListTab />
         </el-tab-pane>
         <el-tab-pane label="統計情報" name="count">
@@ -23,10 +20,9 @@
   
   <script setup>
   import { ref } from 'vue';
-  import { ElTabs, ElTabPane, ElSkeleton } from 'element-plus';
+  import { ElTabs, ElTabPane } from 'element-plus';
   import 'element-plus/dist/index.css';
   import StatusTab from './StatusTab.vue';
-  import SearchTab from './SearchTab.vue';
   import ListTab from './ListTab.vue';
   import CountTab from './CountTab.vue';
   import ClientDownloadTab from './ClientDownloadTab.vue';

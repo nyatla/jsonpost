@@ -1,78 +1,77 @@
 <template>
   <div class="list-tab">
-    <el-card shadow="always">
-      <h2>ドキュメントリスト</h2>
-      <el-form class="form-area" label-position="top" @submit.prevent>
-        <el-row :gutter="10" class="compact-row">
-          <el-col :span="6">
-            <el-form-item label="Offset" class="compact-form-item">
-              <el-input v-model.number="offset" type="number" placeholder="0" size="small" class="input-box" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="Limit" class="compact-form-item">
-              <el-input v-model.number="limit" type="number" placeholder="10" size="small" class="input-box" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="10" class="compact-row">
-          <el-col :span="12">
-            <el-form-item label="Path" class="compact-form-item">
-              <el-input v-model="path" placeholder="$.key" size="small" class="input-box-wide" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="10" class="compact-row">
-          <el-col :span="12">
-            <el-form-item label="Value" class="compact-form-item">
-              <el-input v-model="value" placeholder="検索値" size="small" class="input-box-wide" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row class="compact-row">
-          <el-col :span="4" class="search-button">
-            <el-form-item class="compact-form-item">
-              <el-button type="primary" @click="fetchList" size="large">検索</el-button>
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
+    <h2>ドキュメントリスト</h2>
+    <el-form class="form-area" label-position="top" @submit.prevent>
+      <el-row :gutter="10" class="compact-row">
+        <el-col :span="6">
+          <el-form-item label="Offset" class="compact-form-item">
+            <el-input v-model.number="offset" type="number" placeholder="0" size="small" class="input-box" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="6">
+          <el-form-item label="Limit" class="compact-form-item">
+            <el-input v-model.number="limit" type="number" placeholder="10" size="small" class="input-box" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="10" class="compact-row">
+        <el-col :span="12">
+          <el-form-item label="Path" class="compact-form-item">
+            <el-input v-model="path" placeholder="$.key" size="small" class="input-box-wide" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="10" class="compact-row">
+        <el-col :span="12">
+          <el-form-item label="Value" class="compact-form-item">
+            <el-input v-model="value" placeholder="検索値" size="small" class="input-box-wide" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row class="compact-row">
+        <el-col :span="4" class="search-button">
+          <el-form-item class="compact-form-item">
+            <el-button type="primary" @click="fetchList" size="large">検索</el-button>
+          </el-form-item>
+        </el-col>
+      </el-row>
+    </el-form>
 
-      <el-table
-        v-if="listData && listData.result && listData.result.table && listData.result.table.rows.length > 0"
-        :data="listData.result.table.rows.map(row => Object.fromEntries(row.map((val, idx) => [listData.result.table.head[idx], listData.result.table.head[idx] === 'timestamp' ? new Date(val).toLocaleString() : val])))"
-        style="width: 100%; margin-top: 20px; font-size: 12px; border: none; table-layout: fixed;"
-      >
-        <el-table-column prop="timestamp" :width="160">
-          <template #default="scope">
-            <div style="white-space: nowrap; text-align: center;">
-              {{ scope.row.timestamp }}<br />
-              <el-button type="primary" size="small" @click.stop="openDetailWindow(scope.row)">開く</el-button>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column>
-          <template #default="scope">
-            <table style="width: 100%; font-size: 10px; border-collapse: collapse; table-layout: fixed;">
-              <tr v-for="(entry, index) in Object.entries(scope.row).filter(([k]) => k !== 'timestamp')" :key="index">
-                <td style="font-weight: bold; padding: 2px 4px; width: 100px; border: 1px solid #ccc; white-space: nowrap;">{{ entry[0] }}</td>
-                <td style="padding: 2px 4px; border: 1px solid #ccc; word-break: break-word; width: calc(100% - 100px);">{{ entry[1] }}</td>
-              </tr>
-            </table>
-          </template>
-        </el-table-column>
-      </el-table>
+    <el-table
+      v-if="listData && listData.result && listData.result.table && listData.result.table.rows.length > 0"
+      :data="listData.result.table.rows.map(row => Object.fromEntries(row.map((val, idx) => [listData.result.table.head[idx], listData.result.table.head[idx] === 'timestamp' ? new Date(val).toLocaleString() : val])))"
+      style="width: 100%; margin-top: 20px; font-size: 12px; border: none; table-layout: auto;"
+    >
+      <el-table-column>
+        <template #default="scope">
+          <table style="width: 100%; font-size: 10px; border-collapse: collapse; table-layout: auto;">
+            <tr>
+              <td style="font-weight: bold; padding: 2px 4px; width: 1%; border: 1px solid #ccc; white-space: nowrap;">timestamp</td>
+              <td style="padding: 2px 4px; border: 1px solid #ccc; word-break: break-word;">{{ scope.row.timestamp }}</td>
+            </tr>
+            <tr v-for="(entry, index) in Object.entries(scope.row).filter(([k]) => k !== 'timestamp')" :key="index">
+              <td style="font-weight: bold; padding: 2px 4px; width: 1%; border: 1px solid #ccc; white-space: nowrap;">{{ entry[0] }}</td>
+              <td style="padding: 2px 4px; border: 1px solid #ccc; word-break: break-word;">{{ entry[1] }}</td>
+            </tr>
+            <tr>
+              <td colspan="2" style="text-align: right; padding-top: 6px;">
+                <el-button type="primary" size="small" @click.stop="openDetailWindow(scope.row)">開く</el-button>
+              </td>
+            </tr>
+          </table>
+        </template>
+      </el-table-column>
+    </el-table>
 
-      <div v-else-if="listData" class="result-text">データが見つかりませんでした。</div>
+    <div v-else-if="listData" class="result-text">データが見つかりませんでした。</div>
 
-      <el-skeleton v-else :rows="5" animated />
-    </el-card>
+    <div v-else class="placeholder-text">検索条件を入力して「検索」を押すと結果が表示されます。</div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
-import { ElCard, ElForm, ElFormItem, ElInput, ElButton, ElTable, ElTableColumn, ElSkeleton, ElRow, ElCol } from 'element-plus';
+import { ElForm, ElFormItem, ElInput, ElButton, ElTable, ElTableColumn, ElRow, ElCol } from 'element-plus';
 import 'element-plus/dist/index.css';
 import { apiBaseUrl } from '../config';
 
@@ -112,6 +111,11 @@ const openDetailWindow = (row) => {
 <style lang="less">
 .list-tab {
   padding: 20px;
+  .dashboard-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 16px;
+  }
   .form-area {
     margin-bottom: 20px;
     .compact-row {
@@ -153,6 +157,15 @@ const openDetailWindow = (row) => {
     white-space: pre-wrap;
     font-family: monospace;
     color: #333;
+  }
+  .placeholder-text {
+    margin-top: 20px;
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    background-color: #fafafa;
+    border: 1px dashed #ccc;
+    border-radius: 6px;
   }
 }
 </style>
