@@ -1,6 +1,6 @@
 <template>
   <div class="list-tab">
-    <h2>ドキュメントリスト</h2>
+    <h2 class="page-title">ドキュメントリスト</h2>
     <el-form class="form-area" label-position="top" @submit.prevent>
       <el-row :gutter="10" class="compact-row">
         <el-col :span="6">
@@ -40,21 +40,21 @@
     <el-table
       v-if="listData && listData.result && listData.result.table && listData.result.table.rows.length > 0"
       :data="listData.result.table.rows.map(row => Object.fromEntries(row.map((val, idx) => [listData.result.table.head[idx], listData.result.table.head[idx] === 'timestamp' ? new Date(val).toLocaleString() : val])))"
-      style="width: 100%; margin-top: 20px; font-size: 12px; border: none; table-layout: auto;"
+      class="results-table"
     >
       <el-table-column>
         <template #default="scope">
-          <table style="width: 100%; font-size: 10px; border-collapse: collapse; table-layout: auto;">
+          <table class="entry-table">
             <tr>
-              <td style="font-weight: bold; padding: 2px 4px; width: 1%; border: 1px solid #ccc; white-space: nowrap;">timestamp</td>
-              <td style="padding: 2px 4px; border: 1px solid #ccc; word-break: break-word;">{{ scope.row.timestamp }}</td>
+              <td class="label-cell">timestamp</td>
+              <td class="value-cell">{{ scope.row.timestamp }}</td>
             </tr>
             <tr v-for="(entry, index) in Object.entries(scope.row).filter(([k]) => k !== 'timestamp')" :key="index">
-              <td style="font-weight: bold; padding: 2px 4px; width: 1%; border: 1px solid #ccc; white-space: nowrap;">{{ entry[0] }}</td>
-              <td style="padding: 2px 4px; border: 1px solid #ccc; word-break: break-word;">{{ entry[1] }}</td>
+              <td class="label-cell">{{ entry[0] }}</td>
+              <td class="value-cell">{{ entry[1] }}</td>
             </tr>
             <tr>
-              <td colspan="2" style="text-align: right; padding-top: 6px;">
+              <td colspan="2" class="open-button">
                 <el-button type="primary" size="small" @click.stop="openDetailWindow(scope.row)">開く</el-button>
               </td>
             </tr>
@@ -62,6 +62,17 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <div v-if="listData && listData.result && listData.result.total > limit" class="pagination">
+      <el-pagination
+        layout="prev, pager, next"
+        :total="listData.result.total"
+        :page-size="limit"
+        :current-page="(offset / limit) + 1"
+        @current-change="handlePageChange"
+        size="small"
+      />
+    </div>
 
     <div v-else-if="listData" class="result-text">データが見つかりませんでした。</div>
 
@@ -71,7 +82,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { ElForm, ElFormItem, ElInput, ElButton, ElTable, ElTableColumn, ElRow, ElCol } from 'element-plus';
+import { ElForm, ElFormItem, ElInput, ElButton, ElTable, ElTableColumn, ElPagination, ElRow, ElCol } from 'element-plus';
 import 'element-plus/dist/index.css';
 import { apiBaseUrl } from '../config';
 
@@ -100,6 +111,11 @@ const fetchList = async () => {
   }
 };
 
+const handlePageChange = (page) => {
+  offset.value = (page - 1) * limit.value;
+  fetchList();
+};
+
 const openDetailWindow = (row) => {
   const uuid = row.uuid_document;
   if (uuid) {
@@ -111,25 +127,24 @@ const openDetailWindow = (row) => {
 <style lang="less">
 .list-tab {
   padding: 20px;
-  .dashboard-title {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 16px;
-  }
+
   .form-area {
     margin-bottom: 20px;
     .compact-row {
       margin-bottom: 4px !important;
     }
   }
+
   .compact-form-item {
     margin-bottom: 6px !important;
   }
+
   .el-form-item__label {
     display: block;
     margin-bottom: 4px;
     font-weight: bold;
   }
+
   .search-button {
     display: flex;
     align-items: flex-end;
@@ -140,24 +155,52 @@ const openDetailWindow = (row) => {
       height: auto;
     }
   }
+
   .input-box {
     width: 100%;
     height: 32px;
   }
+
   .input-box-wide {
     width: 100%;
     height: 36px;
   }
-  .result-text {
+
+  .results-table {
+    width: 100%;
     margin-top: 20px;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    font-family: monospace;
-    color: #333;
+    font-size: 12px;
   }
+
+  .entry-table {
+    width: 100%;
+    font-size: 10px;
+    border-collapse: collapse;
+    table-layout: auto;
+
+    td {
+      padding: 2px 4px;
+      border: 1px solid #ccc;
+    }
+
+    .label-cell {
+      width: 1%;
+      white-space: nowrap;
+      font-weight: bold;
+    }
+
+    .open-button {
+      text-align: right;
+      padding-top: 6px;
+    }
+  }
+
+  .pagination {
+    margin-top: 30px;
+    text-align: center;
+  }
+
+  .result-text,
   .placeholder-text {
     margin-top: 20px;
     padding: 20px;
