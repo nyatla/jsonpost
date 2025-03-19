@@ -98,7 +98,7 @@ function konnichiwa($db,string $rawData): IResponseBuilder
     $result = $db->query($checkSql);
     
     // properties テーブルが存在しない場合、初期化を実行
-    if ($result->fetch()) {
+    if(Config::isInitialized($db)){
         ErrorResponseBuilder::throwResponse(501);
     }
 

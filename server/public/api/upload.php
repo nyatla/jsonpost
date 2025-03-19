@@ -74,7 +74,9 @@ class JcsLikeJsonEncoder
 // アップロードAPIの処理
 function upload($db,$rawData):IResponseBuilder
 {
-
+    if(!Config::isInitialized($db)){
+        ErrorResponseBuilder::throwResponse(503);
+    }
     $endpoint=PoWAccountRequiredEndpoint::create($db,$rawData);
     //書き込むデータは、JCSの場合はそのまま、そうでなければソートしたJCSライクなJSON
 

@@ -82,6 +82,10 @@ function byOffset($db,$uuid,$path,$is_raw): IResponseBuilder
 // SQLiteデータベースに接続
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 try{
+    if(!Config::isInitialized($db)){
+        ErrorResponseBuilder::throwResponse(503);
+    }
+
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         ErrorResponseBuilder::throwResponse(101,status:405);
     }

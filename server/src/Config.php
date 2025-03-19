@@ -23,6 +23,15 @@ class Config{
         $db->setAttribute(PDO::ATTR_TIMEOUT, 10);
         return $db;
     }
+    public static function isInitialized(PDO $db){
+        // テーブルがすでに存在するかを確認
+        $checkSql = "SELECT name FROM sqlite_master WHERE type='table' AND name='properties';";
+        $result = $db->query($checkSql);
+        
+        // properties テーブルが存在しない場合、初期化を実行
+        return false !==$result->fetch();
+    }
+
 }    
 
     //Configによる処刑

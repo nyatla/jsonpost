@@ -78,16 +78,23 @@ import { apiBaseUrl } from '../config';
 
 const status = ref(null);
 const loading = ref(false);
-
+const emit = defineEmits(['error']);
 const fetchStatus = async () => {
   loading.value = true;
   try {
     const response = await fetch(`${apiBaseUrl}/status.php`);
     const data = await response.json();
     status.value = data;
+    if (!data.success) {
+      emit('error', data.error); // エラーを親コンポーネントに送る
+      return;
+    }
+    
+    status.value = data;
   } catch (error) {
-    console.error('ステータス取得エラー:', error);
+    emit('error', { code: '通信エラー', message: 'サーバーに接続できませんでした。' });
   } finally {
+
     loading.value = false;
   }
 };

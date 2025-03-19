@@ -30,6 +30,9 @@ use Jsonpost\db\tables\{EcdasSignedAccountRootRecord,HistoryRecord};
 
 $db = Config::getRootDb();//new PDO('sqlite:benchmark_data.db');
 try{
+    if(!Config::isInitialized($db)){
+        ErrorResponseBuilder::throwResponse(503);
+    }    
     //前処理
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         ErrorResponseBuilder::throwResponse(err_code: 101,status:405);

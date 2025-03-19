@@ -1,19 +1,27 @@
 <template>
     <div class="dashboard">
       <h1 class="title">JSONPOST ダッシュボード</h1>
-      <el-tabs v-model="activeTab" class="custom-tabs" tab-position="top">
+  
+      <!-- エラーメッセージのみ表示 -->
+      <div v-if="errorMessage" class="error-message">
+        <p>エラーコード: {{ errorCode }}</p>
+        <p>{{ errorMessage }}</p>
+      </div>
+  
+      <!-- 通常タブ表示 -->
+      <el-tabs v-else v-model="activeTab" class="custom-tabs" tab-position="top">
         <div class="tabs-center">
           <el-tab-pane label="ステータス" name="status">
-            <StatusTab />
+            <StatusTab @error="handleError" />
           </el-tab-pane>
           <el-tab-pane label="統計情報" name="count">
-            <CountTab />
+            <CountTab @error="handleError" />
           </el-tab-pane>
           <el-tab-pane label="データ検索" name="search">
-            <ListTab />
+            <ListTab @error="handleError" />
           </el-tab-pane>
           <el-tab-pane label="クライアントの入手" name="client">
-            <ClientDownloadTab />
+            <ClientDownloadTab @error="handleError" />
           </el-tab-pane>
         </div>
       </el-tabs>
@@ -30,6 +38,18 @@
   import ClientDownloadTab from './ClientDownloadTab.vue';
   
   const activeTab = ref('status');
+  const errorMessage = ref(null);
+  const errorCode = ref(null);
+  
+  const handleError = (error) => {
+    if (error && error.code) {
+      errorCode.value = error.code;
+      errorMessage.value = error.message;
+    } else {
+      errorCode.value = '不明';
+      errorMessage.value = '不明なエラーが発生しました。';
+    }
+  };
   </script>
   
   <style lang="less">
@@ -43,6 +63,19 @@
       font-weight: bold;
       margin-bottom: 20px;
       text-align: center;
+    }
+  
+    .error-message {
+      margin-top: 40px;
+      padding: 20px;
+      border: 1px solid #ff4d4f;
+      background: #fff2f0;
+      color: #d32f2f;
+      font-weight: bold;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 18px;
+      line-height: 1.6;
     }
   }
   

@@ -1,5 +1,63 @@
-# Vue 3 + TypeScript + Vite
+# JsonPost ダッシュボード
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+このリポジトリは、JsonPost サーバ用の Web ダッシュボードです。ブラウザ上からサーバーの状態確認やデータ検索、統計取得、クライアントツールのダウンロードが行えます。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## セットアップ手順
+
+### 1. 必要環境
+- Node.js (推奨バージョン: 18.x 以降)
+- npm (Node.js インストール時に同梱されています)
+
+### 2. パッケージのインストール
+```bash
+npm install
+```
+
+## 利用方法
+
+### 開発用サーバ起動
+```bash
+npm run dev
+```
+ローカルサーバが `http://localhost:7000` で起動します。
+
+### ビルド
+```bash
+npm run build
+```
+`dist/` フォルダにビルド成果物が生成されます。
+
+### プレビュー
+```bash
+npm run preview
+```
+ビルド済みの内容をローカルサーバで確認できます。
+
+### デプロイ
+```bash
+npm run deploy
+```
+ビルドを実行後、`dist/` の内容を `../../server/public` へコピーします。
+
+## フォルダ構成例
+```
+jsonpost-dashboard/
+├── src/
+│   ├── components/
+│   ├── router/
+│   ├── main.ts
+│   ├── App.vue
+├── public/
+├── package.json
+├── vite.config.ts
+└── tsconfig.json
+```
+
+## 使用技術
+- Vue 3
+- TypeScript
+- Vite
+- Element Plus
+- Less
+
+

@@ -33,7 +33,8 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
         401=>'The requested record was not found.',
 
         501=>'The system has already been initialized.',
-        502=>'Implementation error.'
+        502=>'Implementation error.',
+        503=>'The system has not been initialized.',
     ];
 
     
