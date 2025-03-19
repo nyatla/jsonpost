@@ -4,11 +4,13 @@
 
     <div class="metadata-card">
       <table>
-        <tr><th>タイムスタンプ</th><td>{{ new Date(jsonData?.result?.timestamp).toLocaleString() }}</td></tr>
+      <tbody>
+              <tr><th>タイムスタンプ</th><td>{{ new Date(jsonData?.result?.timestamp).toLocaleString() }}</td></tr>
         <tr><th>UUID (アカウント)</th><td>{{ jsonData?.result?.uuid_account }}</td></tr>
         <tr><th>UUID (ドキュメント)</th><td>{{ jsonData?.result?.uuid_document }}</td></tr>
         <tr><th>パス</th><td>{{ jsonData?.result?.path }}</td></tr>
         <tr><th>PowStamp</th><td>{{ jsonData?.result?.powstamp }}</td></tr>
+      </tbody>
       </table>
     </div>
 

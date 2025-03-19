@@ -45,6 +45,8 @@
       <el-table-column>
         <template #default="scope">
           <table class="entry-table">
+          <tbody>
+
             <tr>
               <td class="label-cell">timestamp</td>
               <td class="value-cell">{{ scope.row.timestamp }}</td>
@@ -58,6 +60,8 @@
                 <el-button type="primary" size="small" @click.stop="openDetailWindow(scope.row)">開く</el-button>
               </td>
             </tr>
+          </tbody>
+
           </table>
         </template>
       </el-table-column>

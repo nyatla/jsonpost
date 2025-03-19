@@ -7,6 +7,8 @@
 
       <div v-else-if="status">
         <table class="status-table">
+          <tbody>
+
           <tr>
             <td class="label-cell">version</td>
             <td>{{ displayedStatus.settings.version }}</td>
@@ -27,6 +29,7 @@
             <td class="label-cell">json</td>
             <td>
               <table class="sub-table">
+              <tbody>
                 <tr>
                   <td class="label-cell">jcs</td>
                   <td>{{ displayedStatus.settings.json.jcs }}</td>
@@ -46,9 +49,12 @@
                     </template>
                   </td>
                 </tr>
+              </tbody>
               </table>
             </td>
           </tr>
+        </tbody>
+
         </table>
 
         <el-divider></el-divider>

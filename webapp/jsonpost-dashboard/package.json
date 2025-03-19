@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && cp -r dist/* ../../server/public"
   },
   "dependencies": {
     "element-plus": "^2.9.6",

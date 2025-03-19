@@ -41,6 +41,8 @@
 
     <div v-if="countData && countData.result" class="result-table">
       <table class="simple-table">
+        <tbody>
+
         <tr>
           <th>総レコード数</th>
           <td>{{ countData.result.total }}</td>
@@ -53,7 +55,8 @@
           <th>範囲</th>
           <td>Offset: {{ countData.result.range.offset }} / Limit: {{ countData.result.range.limit }}</td>
         </tr>
-      </table>
+      </tbody>
+    </table>
     </div>
 
     <div v-else-if="countData" class="result-text">データが見つかりませんでした。</div>

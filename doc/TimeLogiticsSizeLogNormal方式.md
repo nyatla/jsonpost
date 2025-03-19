@@ -50,7 +50,7 @@ R = PSR × ETR
 APIのパラメータ表記は以下の形式です。
 
 ```
-tlsln(e, s, s_sigma)
+["tlsln":[e, s, s_sigma]]
 ```
 
 - **e**：目標アクセス間隔（秒）
