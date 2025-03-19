@@ -53,7 +53,7 @@ GET /api/list.php?offset=3&limit=9&path=$.key2&path=$.aaaa
     "table": {
       "head": [
         "timestamp",
-        "uuid_storage",
+        "uuid_document",
         "uuid_account",
         "size",
         "hash"

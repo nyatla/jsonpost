@@ -25,24 +25,28 @@ function byOffset($db,$offset,$limit,$filter,$value): IResponseBuilder
 
     $jsh=new JsonStorageHistory($db);
     $total=$jsh->totalCount();
-
-    if($offset>=$total){
-        ErrorResponseBuilder::throwResponse(103, "Index is too large");
-    }
-    if($limit==-1){
-        $limit=$total-$offset;
-    }else{
-        $limit=min($total-$offset,$limit);
-    }
-    $ret=JsonListQueryRecord::query($db,$offset,$limit,$filter,$value);
     $nitems=[];
-    foreach($ret as $i) {
-        $nitems[]=[
-            $i->timestamp,
-            $i->uuidHistoryAsText(), //document_uuid
-            $i->uuidAccountAsText(), //user_uuid
-            $i->size,
-            bin2hex($i->hash)];
+    if($total>0){
+        if($offset>=$total){
+            ErrorResponseBuilder::throwResponse(103, "Index is too large");
+        }
+        if($limit==-1){
+            $limit=$total-$offset;
+        }else{
+            $limit=min($total-$offset,$limit);
+        }
+        $ret=JsonListQueryRecord::query($db,$offset,$limit,$filter,$value);
+        foreach($ret as $i) {
+            $nitems[]=[
+                $i->timestamp,
+                $i->uuidHistoryAsText(), //document_uuid
+                $i->uuidAccountAsText(), //user_uuid
+                $i->size,
+                bin2hex($i->hash)];
+        }    
+    }else{
+        //ntd
+
     }
  
 

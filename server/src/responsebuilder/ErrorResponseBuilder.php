@@ -70,7 +70,9 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
 
 
     public function sendResponse() {
-
+        header("Access-Control-Allow-Origin: *");
+        header("Access-Control-Allow-Methods: GET, POST");
+        header("Access-Control-Allow-Headers: Content-Disposition, Content-Type, Content-Length, Accept-Encoding");
         header('Content-Type: application/json');
         http_response_code($this->status);
 
