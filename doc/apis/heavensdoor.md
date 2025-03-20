@@ -11,7 +11,7 @@
 
 
 ### 必要なPowStamp
-このAPIは、[`PowStamp2`](../../powstamp2.md) の付与が必須です。
+このAPIは、[`PowStamp2`](../resource/powstamp2.md) の付与が必須です。
 
 
 - **Nonce**: `0` を指定してください。
