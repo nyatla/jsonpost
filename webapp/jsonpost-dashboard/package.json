@@ -10,6 +10,8 @@
     "deploy": "npm run build && cp -r dist/* ../../server/public"
   },
   "dependencies": {
+    "chart.js": "^4.4.8",
+    "chartjs-chart-matrix": "^3.0.0",
     "element-plus": "^2.9.6",
     "less": "^4.2.2",
     "less-loader": "^12.2.0",
