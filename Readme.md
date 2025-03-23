@@ -74,7 +74,10 @@ $ python3 jsonpostcl konnichiwa http://127.0.0.1:8000/api --welcome false --json
 
 再度 `http://127.0.0.1:8000/` を開き、ステータス画面が表示されれば完了です。
 
----
+## ユースケースごとの手順
+
+- [Godアカウント専用無制限JSONストレージ](./doc/usecase/Godアカウント専用無制限JSONストレージ.md)
+- [情報収集用制限付きJSON公開ストレージ](./doc/usecase/情報収集用制限付きJSON公開ストレージ.md)
 
 ## Web UI
 
