@@ -77,7 +77,7 @@ function getPropertiesSet(OperationHistory $oph,PropertiesTable $tbl_properties)
         PropertiesTable::VNAME_WELCOME=>$latest_property->welcome,
         PropertiesTable::VNAME_GOD=>$latest_property->god,
         PropertiesTable::VNAME_POW_ALGORITHM=>$latest_property->pow_algorithm->pack(),
-        PropertiesTable::VNAME_JSON_SCHEMA=>json_decode($latest_property->json_schema),
+        PropertiesTable::VNAME_JSON_SCHEMA=>json_decode($latest_property->json_schema??''),
         PropertiesTable::VNAME_JSON_JCS=>$latest_property->json_jcs
     ];    
 }

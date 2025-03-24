@@ -12,19 +12,19 @@
   
       <el-tabs v-else v-model="activeTab" class="custom-tabs" tab-position="top">
         <el-tab-pane label="ステータス" name="status">
-          <StatusTab @error="handleError" />
+          <StatusTab @error="handleError" :active="activeTab === 'status'" />
         </el-tab-pane>
         <el-tab-pane label="統計情報" name="count">
-          <CountTab />
+          <CountTab :active="activeTab === 'count'"/>
         </el-tab-pane>
         <el-tab-pane label="データ検索" name="search">
-          <ListTab />
+          <ListTab :active="activeTab === 'search'"/>
         </el-tab-pane>
         <el-tab-pane label="クライアントの入手" name="client">
-          <ClientDownloadTab />
+          <ClientDownloadTab :active="activeTab === 'client'"/>
         </el-tab-pane>
         <el-tab-pane label="難度シミュレータ" name="simulator">
-          <DifficultySimulatorTab />
+            <DifficultySimulatorTab :active="activeTab === 'simulator'" />
         </el-tab-pane>
       </el-tabs>
     </div>

@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # server/public/ 以外の全てのディレクトリおよびファイルへのアクセスを禁止
+  RewriteCond %{REQUEST_URI} !^/jsonpost/1/server/public/
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [F,L]
+  
+  # 特定の機密ファイル（例: .env や config.php）へのアクセスを拒否
+  RewriteRule \.env$ - [F,L]
+  RewriteRule ^config\.php$ - [F,L]
+</IfModule>
+
+# ディレクトリ一覧表示を禁止
+Options -Indexes
+
+# 不要なアクセスがあった場合 403 にリダイレクトも可能
+ErrorDocument 403 /error_pages/403.html

@@ -1,6 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import Dashboard from '../components/Dashboard.vue';
 import DetailView from '../components/DetailView.vue';
+
+console.log('Router running in hash mode');
 
 const routes = [
   { path: '/', component: Dashboard },
@@ -8,7 +10,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
 });
 

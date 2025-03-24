@@ -55,6 +55,8 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
             $message="Internal error. unknown error code $err_code not implemented.";
             $status = 500;
             $err_code = 0;
+        }else{
+            $message=ErrorResponseBuilder::$errorMessages[$err_code];
         }
         throw new ErrorResponseBuilder($err_code, $message,$status, $hint);
     }
@@ -63,7 +65,7 @@ class ErrorResponseBuilder extends Exception implements IResponseBuilder  {
     }
     
     private function __construct(int $err_code,string $message=null, int $status = 400,array $hint=null) {
-        parent::__construct($message);
+        parent::__construct(message: $message);
         $this->status = $status;
         $this->hint = $hint;
         $this->err_code = $err_code;

@@ -5,7 +5,7 @@
       <div class="inputs-container">
         <div class="input-group">
           <label>目標アクセス時刻 (time)</label>
-          <el-input-number v-model="time" :min="0.1" :step="0.1" :precision="3" />
+          <el-input-number v-model="time" :min="0.01" :step="0.01" :precision="3" />
         </div>
         <div class="input-group">
           <label>サイズピーク (size_peak)</label>
@@ -19,266 +19,144 @@
       </div>
   
       <div class="charts-row">
-        <div class="chart-section">
-          <h3>時間ロジスティック関数（秒）</h3>
-          <canvas ref="timeChartCanvas" height="200"></canvas>
+        <div class="chart-section" style="height: 200px;">
+          <v-chart ref="timeChart" :option="timeChartOption" autoresize style="width: 100%; height: 100%;" />
         </div>
-        <div class="chart-section">
-          <h3>サイズ対数正規分布関数</h3>
-          <canvas ref="sizeChartCanvas" height="200"></canvas>
+        <div class="chart-section" style="height: 200px;">
+          <v-chart ref="sizeChart" :option="sizeChartOption" autoresize style="width: 100%; height: 100%;" />
         </div>
       </div>
   
-      <div class="chart-section large">
-        <h3>TimeLogiticsSizeLnDifficulty ヒートマップ</h3>
-        <canvas ref="heatmapCanvas" height="500" width="1000"></canvas>
+      <div class="chart-section large" style="height: 300px;">
+        <v-chart ref="heatmapChart" :option="heatmapOption" autoresize style="width: 100%; height: 100%;" />
       </div>
     </div>
   </template>
   
   <script setup lang="ts">
-  import { ref, watch, nextTick, onMounted } from 'vue';
+  import { ref, watch, onMounted, nextTick, onBeforeUnmount } from 'vue';
   import { ElInputNumber, ElButton } from 'element-plus';
-  import { Chart} from 'chart.js/auto';
-  import type { ScriptableContext } from 'chart.js';
-  import { MatrixController, MatrixElement } from 'chartjs-chart-matrix';
+  import VChart from 'vue-echarts';
+  import { use } from 'echarts/core';
+  import { CanvasRenderer } from 'echarts/renderers';
+  import { LineChart, HeatmapChart } from 'echarts/charts';
+  import { GridComponent, VisualMapComponent, TooltipComponent, DatasetComponent } from 'echarts/components';
   import { TimeLogiticsSizeLnDifficulty, LogiticsRateProvider, LogNormalRateProvider } from '../libs/rateProviders';
   import { apiBaseUrl } from '../config';
   
-  Chart.register(MatrixController, MatrixElement);
+  use([
+    CanvasRenderer,
+    LineChart,
+    HeatmapChart,
+    GridComponent,
+    VisualMapComponent,
+    TooltipComponent,
+    DatasetComponent
+  ]);
   
-  const time = ref(10); // ← time_half の代わりに time（API値そのまま）
-  const sizePeak = ref(16);
-  const sizeSigma = ref(0.8);
+  const time = ref<number>(10);
+  const sizePeak = ref<number>(16);
+  const sizeSigma = ref<number>(0.8);
   
-  const timeChartCanvas = ref<HTMLCanvasElement | null>(null);
-  const sizeChartCanvas = ref<HTMLCanvasElement | null>(null);
-  const heatmapCanvas = ref<HTMLCanvasElement | null>(null);
+  const timeChartOption = ref<Record<string, unknown>>({});
+  const sizeChartOption = ref<Record<string, unknown>>({});
+  const heatmapOption = ref<Record<string, unknown>>({});
   
-  let timeChart: Chart | null = null;
-  let sizeChart: Chart | null = null;
-  let heatmapChart: Chart | null = null;
+  const timeChart = ref<InstanceType<typeof VChart> | null>(null);
+  const sizeChart = ref<InstanceType<typeof VChart> | null>(null);
+  const heatmapChart = ref<InstanceType<typeof VChart> | null>(null);
   
   const fetchAndApplyStatus = async () => {
-    try {
-      const res = await fetch(`${apiBaseUrl}/status.php`);
-      const json = await res.json();
-      if (json.success) {
-        const alg = json.result.settings.pow_algorithm;
-        time.value = alg[1][0]; // 倍値をそのまま time に設定
-        sizePeak.value = alg[1][1];
-        sizeSigma.value = alg[1][2];
-      } else {
-        alert(`ステータス取得エラー: ${json.error.message}`);
-      }
-    } catch {
-      alert('ステータス取得に失敗しました。');
+    const res = await fetch(`${apiBaseUrl}/status.php`);
+    const json = await res.json();
+    if (json.success) {
+      const alg = json.result.settings.pow_algorithm;
+      time.value = alg[1][0];
+      sizePeak.value = alg[1][1];
+      sizeSigma.value = alg[1][2];
     }
   };
   
-  const drawTimeChart = async () => {
-    if (timeChart) timeChart.destroy();
-    await nextTick();
-  
-    const halfTime = time.value / 2; // 内部計算で0.5倍
-    const provider = new LogiticsRateProvider(halfTime);
-    const data = [];
-    const tMax = halfTime * 100;
-    const steps = 100;
-    for (let i = 0; i <= steps; i++) {
-      const t = Math.exp(Math.log(0.1) + (Math.log(tMax) - Math.log(0.1)) * (i / steps));
-      data.push({ x: t, y: provider.rate(t) });
-    }
-  
-    timeChart = new Chart(timeChartCanvas.value!.getContext('2d')!, {
-      type: 'line',
-      data: {
-        datasets: [{
-          label: '時間ロジスティック',
-          data,
-          borderWidth: 2,
-          fill: false,
-          tension: 0,
-          pointRadius: 0,
-        }],
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        scales: {
-          x: { type: 'logarithmic', title: { display: true, text: '時間（秒）' } },
-          y: { title: { display: true, text: 'rate' }, min: 0, max: 1 },
-        },
-      },
-    });
+  const throttle = (fn: (...args: unknown[]) => void, delay: number) => {
+    let lastCall = 0;
+    return (...args: unknown[]) => {
+      const now = new Date().getTime();
+      if (now - lastCall < delay) return;
+      lastCall = now;
+      fn(...args);
+    };
   };
   
-  const drawSizeChart = async () => {
-    if (sizeChart) sizeChart.destroy();
-    await nextTick();
-  
-    const provider = new LogNormalRateProvider(sizePeak.value, sizeSigma.value);
-    const data = [];
-    const sMin = sizePeak.value / 10;
-    const sMax = sizePeak.value * 100;
-    const steps = 100;
-    for (let i = 0; i <= steps; i++) {
-      const s = Math.exp(Math.log(sMin) + (Math.log(sMax) - Math.log(sMin)) * (i / steps));
-      data.push({ x: s, y: provider.rate(s) });
+  const updateCharts = throttle(() => {
+    const tProvider = new LogiticsRateProvider(time.value / 2);
+    const tMax = (time.value / 2) * 100;
+    const tX: number[] = [], tY: number[] = [];
+    for (let i = 0; i <= 100; i++) {
+      const tVal = Math.exp(Math.log(0.1) + (Math.log(tMax) - Math.log(0.1)) * (i / 100));
+      tX.push(tVal);
+      tY.push(tProvider.rate(tVal));
     }
+    timeChartOption.value = {
+      grid: { containLabel: true, left: 40, right: 20, top: 50, bottom: 40 },
+      xAxis: { type: 'log' },
+      yAxis: {},
+      series: [{ data: tX.map((x, i) => [x, tY[i]]), type: 'line', smooth: true }],
+    };
   
-    sizeChart = new Chart(sizeChartCanvas.value!.getContext('2d')!, {
-      type: 'line',
-      data: {
-        datasets: [{
-          label: 'サイズ分布',
-          data,
-          borderWidth: 2,
-          fill: false,
-          tension: 0,
-          pointRadius: 0,
-        }],
-      },
-      options: {
-        responsive: true,
-        animation: false,
-        scales: {
-          x: { type: 'logarithmic', title: { display: true, text: 'サイズ (KB)' } },
-          y: { title: { display: true, text: 'rate' }, min: 0, max: 1 },
-        },
-      },
-    });
-  };
-  
-  const drawHeatmap = async () => {
-  if (heatmapChart) heatmapChart.destroy();
-  await nextTick();
-
-  const difficulty = new TimeLogiticsSizeLnDifficulty(time.value * 0.5, sizePeak.value, sizeSigma.value);
-  const data = [];
-
-  const tSteps = 50;
-  const sSteps = 100;
-  const tMin = 0.1;
-  const tMax = time.value * 0.5 * 100;
-
-  const sMin = Math.max(sizePeak.value / 100, 0.001);
-  const sMax = sizePeak.value * 100;
-
-  for (let i = 0; i < tSteps; i++) {
-    const t = Math.exp(Math.log(tMin) + (Math.log(tMax) - Math.log(tMin)) * (i / (tSteps - 1)));
-    for (let j = 0; j < sSteps; j++) {
-      const frac = 1 - (j / (sSteps - 1));
-      const s = Math.exp(Math.log(sMin) + (Math.log(sMax) - Math.log(sMin)) * frac);
-
-      const z = difficulty.rate(t, s);
-      data.push({
-        x: t,
-        y: j,
-        v: z,
-        realSize: s
-      });
+    const sProvider = new LogNormalRateProvider(sizePeak.value, sizeSigma.value);
+    const sX: number[] = [], sY: number[] = [];
+    for (let i = 0; i <= 100; i++) {
+      const sVal = Math.exp(Math.log(sizePeak.value / 10) + (Math.log(sizePeak.value * 100) - Math.log(sizePeak.value / 10)) * (i / 100));
+      sX.push(sVal);
+      sY.push(sProvider.rate(sVal));
     }
-  }
+    sizeChartOption.value = {
+      grid: { containLabel: true, left: 40, right: 20, top: 50, bottom: 40 },
+      xAxis: { type: 'log' },
+      yAxis: {},
+      series: [{ data: sX.map((x, i) => [x, sY[i]]), type: 'line', smooth: true }],
+    };
+  
+    const difficulty = new TimeLogiticsSizeLnDifficulty(time.value * 0.5, sizePeak.value, sizeSigma.value);
+    const tSteps = 50, sSteps = 100;
+    const heatmapData: [number, number, number][] = [];
+    const tLabels: string[] = [];
+    const sLabels: string[] = [];
 
-  heatmapChart = new Chart(heatmapCanvas.value!.getContext('2d')!, {
-    type: 'matrix',
-    data: {
-      datasets: [{
-        label: 'ヒートマップ',
-        data: data.map(p => ({
-          x: p.x,
-          y: p.y,
-          v: p.v,
-          width: (tMax - tMin) / tSteps,
-          height: 1,
-        })),
-        backgroundColor: (ctx:ScriptableContext<"matrix">) => {
-            const v = (ctx.raw as { v: number }).v;
-          let r = 0, g = 0, b = 0;
-
-          if (v < 0.33) {
-            const ratio = v / 0.33;
-            r = Math.floor(255 * ratio);
-          } else if (v < 0.66) {
-            const ratio = (v - 0.33) / 0.33;
-            r = 255;
-            g = Math.floor(255 * ratio);
-          } else {
-            const ratio = (v - 0.66) / 0.34;
-            r = Math.floor(255 * (1 - ratio));
-            g = 255;
-          }
-
-          return `rgb(${r},${g},${b})`;
-        },
-        borderWidth: 0,
-      }],
-    },
-    options: {
-      responsive: true,
-      animation: false,
-      scales: {
-        x: {
-          type: 'logarithmic',
-          min: tMin,
-          max: tMax,
-          title: { display: true, text: '時間（秒）' },
-          ticks: { padding: 30 },
-          grid: { display: false }
-        },
-        y: {
-          type: 'linear',
-          min: 0,
-          max: sSteps - 1,
-          title: { display: true, text: 'サイズ (KB)' },
-          ticks: {
-            callback: (val) => {
-              const frac = 1 - (val as number) / (sSteps - 1);
-              const sVal = Math.exp(Math.log(sMin) + (Math.log(sMax) - Math.log(sMin)) * frac);
-              return sVal < 1 ? sVal.toFixed(3) : `${Math.round(sVal)}`;
-            },
-            padding: 20,
-          },
-          grid: { display: false }
-        },
-      },
-      layout: { padding: { top: 50, bottom: 30 } },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: (ctx) => {
-            const point = ctx[0].raw as { x: number; y: number; v: number };
-              const frac = 1 - point.y / (sSteps - 1);
-              const sVal = Math.exp(Math.log(sMin) + (Math.log(sMax) - Math.log(sMin)) * frac);
-              return `時間: ${point.x.toFixed(2)}s, サイズ: ${sVal < 1 ? sVal.toFixed(3) : Math.round(sVal)}KB`;
-            },
-            label: (ctx) => `難易度: ${(ctx.raw as {v:number}).v.toFixed(2)} （1=易 / 0=難）`,
-          }
+    for (let i = 0; i < tSteps; i++) {
+      const t = Math.exp(Math.log(0.1) + (Math.log(tMax) - Math.log(0.1)) * (i / (tSteps - 1)));
+      tLabels.push(t.toFixed(2));
+      for (let j = 0; j < sSteps; j++) {
+        if (i === 0) {
+          const s = Math.exp(Math.log(sizePeak.value / 100) + (Math.log(sizePeak.value * 100) - Math.log(sizePeak.value / 100)) * (j / (sSteps - 1)));
+          sLabels.push(s.toFixed(2));
         }
+        const s = Math.exp(Math.log(sizePeak.value / 100) + (Math.log(sizePeak.value * 100) - Math.log(sizePeak.value / 100)) * (j / (sSteps - 1)));
+        heatmapData.push([i, j, difficulty.rate(t, s)]);
       }
-    },
-  });
-};
-
-
-
-
+    }
+    heatmapOption.value = {
+      grid: { containLabel: true, left: 60, right: 40, top: 60, bottom: 60 },
+      tooltip: {},
+      xAxis: { type: 'category', data: tLabels },
+      yAxis: { type: 'category', data: sLabels },
+      visualMap: { min: 0, max: 1, orient: 'vertical', left: 'right', top: 'center' },
+      series: [{ type: 'heatmap', data: heatmapData, emphasis: { focus: 'series' } }],
+    };
   
-  watch([time, sizePeak, sizeSigma], () => {
-    drawTimeChart();
-    drawSizeChart();
-    drawHeatmap();
-  });
+    nextTick(() => {
+      timeChart.value?.resize();
+      sizeChart.value?.resize();
+      heatmapChart.value?.resize();
+    });
+  }, 200);
   
-  onMounted(() => {
-    drawTimeChart();
-    drawSizeChart();
-    drawHeatmap();
+  watch([time, sizePeak, sizeSigma], updateCharts);
+  onMounted(updateCharts);
+  onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateCharts);
   });
   </script>
-  
   
   <style scoped lang="less">
   .simulator-tab {
@@ -323,18 +201,13 @@
       .chart-section {
         flex: 1 1 48%;
         min-width: 300px;
-  
-        canvas {
-          width: 100%;
-        }
+        height: 200px;
       }
     }
   
     .chart-section.large {
-      canvas {
-        width: 100%;
-      }
+      width: 100%;
+      height: 300px;
     }
   }
   </style>
-  

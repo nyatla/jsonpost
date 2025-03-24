@@ -17,7 +17,7 @@ class Config{
     //
     public const ENABLE=true;   
     static function getRootDb(): PDO{
-        $fpath=dirname(__FILE__).Config::DB_PATH;
+        $fpath=$fpath = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . ltrim(Config::DB_PATH, '/\\');
         $db = new PDO("sqlite:$fpath");
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $db->setAttribute(PDO::ATTR_TIMEOUT, 10);

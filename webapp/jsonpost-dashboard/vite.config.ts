@@ -4,6 +4,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
+  base: './',   // ← これで相対パスで出力されるようになります
   plugins: [vue()],
   server: {
     port: 7000,
@@ -20,6 +21,7 @@ export default defineConfig({
     },
   },
   build: {
+    sourcemap: false,// eval を使う余地を排除    
     rollupOptions: {
       output: {
         assetFileNames: (assetInfo) => {
