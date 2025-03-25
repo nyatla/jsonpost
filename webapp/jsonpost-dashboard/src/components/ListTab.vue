@@ -123,7 +123,7 @@ const handlePageChange = (page) => {
 const openDetailWindow = (row) => {
   const uuid = row.uuid_document;
   if (uuid) {
-    window.open(`/detail/${uuid}`, '_blank');
+    window.open(`#/detail/${uuid}`, '_blank');
   }
 };
 </script>

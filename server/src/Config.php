@@ -10,14 +10,14 @@ use \PDO as PDO;
 class Config{
     public const VERSION="nyatla.jp:jsonpost:1";
     //データベースファイルの場所
-    public const DB_PATH="../../db/test.sqlite3";
+    public const DB_PATH="../db/test.sqlite3";
     //JSONの最大サイズ
     public const MAX_JSON_SIZE=256*1024;
     public const NEW_ACCOUNT_PER_SEC= 1;
     //
     public const ENABLE=true;   
     static function getRootDb(): PDO{
-        $fpath=$fpath = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . ltrim(Config::DB_PATH, '/\\');
+        $fpath = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . ltrim(Config::DB_PATH, '/\\');
         $db = new PDO("sqlite:$fpath");
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $db->setAttribute(PDO::ATTR_TIMEOUT, 10);
