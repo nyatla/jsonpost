@@ -11,7 +11,7 @@ class StorageQueryRecord {
     public string $uuid_account;
     public string $uuid_history;
     public int $timestamp;
-    public string $powstamp;
+    public string $powstampmsg;
     public string $json;
     public function uuidHistoryAsText():string{
         return UuidWrapper::bin2text($this->uuid_history);
@@ -20,7 +20,7 @@ class StorageQueryRecord {
         return UuidWrapper::bin2text($this->uuid_account);
     }    
     public function powStampAsHex():string{
-        return bin2hex($this->powstamp);
+        return bin2hex($this->powstampmsg);
     }
 
     // クエリメソッド
@@ -43,7 +43,7 @@ class StorageQueryRecord {
                     jr.*,
                     h.id_account,
                     h.timestamp,
-                    h.powstamp,
+                    h.powstampmsg,
                     h.pow_required                  
                 FROM json_reord jr
                 JOIN history h ON h.id = jr.id_history
@@ -54,7 +54,7 @@ class StorageQueryRecord {
                     a.uuid as uuid_account,
                     hj.uuid_history,
                     hj.timestamp,
-                    hj.powstamp,
+                    hj.powstampmsg,
                     hj.pow_required           
                 FROM history_joined hj
                 JOIN account_root a ON hj.id_account = a.id
