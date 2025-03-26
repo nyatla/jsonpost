@@ -2,16 +2,17 @@
 namespace Jsonpost\db\tables;
 
 use Jsonpost\utils\ecdsasigner\PowStamp2;
+use Jsonpost\utils\ecdsasigner\PowStamp2Message;
 use \PDO as PDO;
 
 class HistoryRecord{
     public int $id;
     public int $timestamp;
     public int $id_account;
-    public string $powstamp;
+    public string $powstampmsg;
     public int $pow_required;
-    public function  powstampAsObject():PowStamp2{
-        return new PowStamp2($this->powstamp);
+    public function  powstampMessageAsObject():PowStamp2Message{
+        return new PowStamp2Message($this->powstampmsg);
     }
 
     public static function selectLatestStorageHistoryByAccount(PDO $db,$account_id):HistoryRecord|false

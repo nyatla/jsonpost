@@ -47,9 +47,9 @@ class PowStamp2 {
             $payload ? hash('sha256', $payload, true) : null         
         );
     }
-    public function getHash(): string {
-        return hash('sha256', $this->stamp, true);
-    }
+    // public function getHash(): string {
+    //     return hash('sha256', $this->stamp, true);
+    // }
     
     /**
      * 署名が適切か評価する。
@@ -57,21 +57,22 @@ class PowStamp2 {
      * @param mixed $payload
      * @return bool
      */
-    public static function verify(self $stamp, ?string $chain_hash, ?string $payload = null): bool {
-        $psm = $stamp->recoverMessage($chain_hash,$payload);
-        // print_r(bin2hex($stamp->stamp)."\n");        
-        // print_r(bin2hex($stamp->getPowStampSignature())."\n");        
-        // print_r(bin2hex($psm->getEcdsaPubkey())."\n");        
-        // print_r(bin2hex($psm->message)."\n");        
-        // print_r(bin2hex($psm->getServerDomainHash())."\n");        
-        // print_r(bin2hex($psm->getPayloadHash())."\n");        
-        // print_r("-----------");
-        return EcdsaSignerLite::verify(
-            bin2hex($stamp->getPowStampSignature()),
+    public function verify(PowStamp2Message $psm): bool {
+        try{
+            return EcdsaSignerLite::verify(
+            bin2hex($this->getPowStampSignature()),
             bin2hex($psm->getEcdsaPubkey()),
             $psm->message
-        );
+            );
+        }catch(Exception $e){
+            //詳細エラーが取れることある。
+            ErrorResponseBuilder::throwResponse(203,$e->getMessage());
+            throw $e;//Never called.
+        }
     }
+
+    
+ 
     public static function createFromHeader():PowStamp2
     {
         $powstamp1 = $_SERVER['HTTP_POWSTAMP_2'] ?? null;
@@ -86,18 +87,13 @@ class PowStamp2 {
         }    
         return $ret;
     }
-    public static function createVerifiedFromHeader(?string $chain_hash,?string $rawData):PowStamp2{
-        $stamp=self::createFromHeader();
-        $verify_ret=false;
-        try{
-            $verify_ret=PowStamp2::verify($stamp,$chain_hash,$rawData);
-        }catch(Exception $e){
-            //詳細エラーが取れることある。
-            ErrorResponseBuilder::throwResponse(203,$e->getMessage());
-        }
-        if(!$verify_ret){
-            ErrorResponseBuilder::throwResponse(203);
-        }
-        return $stamp;
-    }
+    // public static function createVerifiedFromHeader(?string $chain_hash,?string $rawData):PowStamp2{
+    //     $stamp=self::createFromHeader();
+    //     $verify_ret=$stamp->verify(PowStamp2Message::createFromStamp($stamp,$chain_hash,$rawData));
+
+    //     if(!$verify_ret){
+    //         ErrorResponseBuilder::throwResponse(203);
+    //     }
+    //     return $stamp;
+    // }
 }

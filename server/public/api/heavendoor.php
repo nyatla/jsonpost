@@ -52,7 +52,7 @@ function insertOperationSets(History $history_tbl,OperationHistory $oph_tbl,Acco
     $tbl_rec=$history_tbl->insert(
         $endpoint->accepted_time,
         $endpoint->account->id,
-        $endpoint->stamp->stamp,
+        $endpoint->stamp_message->message,
         0x0000ffffffffffff);
     for($i= 0;$i<count($method_operation);$i++){
         $oph_tbl->insert($tbl_rec->id,$method_operation[$i][0],$method_operation[$i][1]);
@@ -192,7 +192,7 @@ function konnichiwa($db,string $rawData): IResponseBuilder
         [OperationHistory::METHOD_SET_JSON_SCHEMA,$json_schema],
     ]);
     $rec=HistoryRecord::selectLatestAccountFirstHistory($db);
-    $ps=$rec->powstampAsObject();
+    $ps=$rec->powstampMessageAsObject();
     return new SuccessResultResponseBuilder(
         [
             "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
@@ -278,8 +278,8 @@ function setparams($db,string $rawData): IResponseBuilder
             "properties"=>getPropertiesSet($tbl_operation_history,$tbl_properties),
             "chain"=>[
                 "domain"=>"branch",
-                "latest_hash"=>bin2hex($endpoint->stamp->getHash()),
-                "nonce"=>$endpoint->stamp->getNonceAsU48(),
+                "latest_hash"=>bin2hex($endpoint->stamp_message->getHash()),
+                "nonce"=>$endpoint->stamp_message->getNonceAsU48(),
             ]
         ]
     );

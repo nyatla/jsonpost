@@ -3,6 +3,7 @@ namespace Jsonpost\utils\ecdsasigner;
 
 use Jsonpost\utils\ecdsasigner\EasyEcdsaSignature;
 use Exception;
+use Jsonpost\responsebuilder\{ErrorResponseBuilder};
 
 class PowStamp2Message {
     /**
@@ -25,7 +26,9 @@ class PowStamp2Message {
     public function getNonce(): string {
         return substr($this->message, 33, 6);
     }
-
+    public function getNonceAsU48(): int {
+        return unpack('J', "\x00\x00" . $this->getNonce())[1];
+    }
     public function getServerDomainHash(): string {
         return substr($this->message, 39, 32);
     }
@@ -57,4 +60,7 @@ class PowStamp2Message {
         
         return new self($b);
     }
+
+    
+
 }

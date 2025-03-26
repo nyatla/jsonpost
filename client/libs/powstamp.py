@@ -145,19 +145,6 @@ class PowStampBuilder:
         for pw in self.createStampGenerator(nonce,server_domain,payload):
             if pw.powScore32<=target_score:
                 return pw
-        # es=self.es
-        # spubkey=EcdsaSignner.compressPubKey(es.public_key)
-        # sm=PowStampMessage.create(
-        #     spubkey,
-        #     struct.pack('>I', nonce),
-        #     None if server_domain is None else hashlib.sha256(server_domain.encode()).digest(),
-        #     None if payload is None else hashlib.sha256(payload).digest()
-        # )
-        # hash_base=es.sign(sm.message)+spubkey+struct.pack('>I',nonce)
-        # for i in range(0xffffffff):
-        #     pw=PowStamp(hash_base+struct.pack('>I', i))
-        #     if pw.powScore32<=target_score:
-        #         return pw
         raise ValueError(f"Failed to find a valid PoW nonce for target_score={target_score}")
 
 

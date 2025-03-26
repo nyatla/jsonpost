@@ -9,6 +9,7 @@ use Jsonpost\utils\ecdsasigner\PowStamp2;
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
 
 
+use Jsonpost\utils\ecdsasigner\PowStamp2Message;
 use PDO;
 
 
@@ -33,8 +34,8 @@ class PoWAccountRequiredEndpoint extends AStampRequiredEndpoint
     // public readonly int $next_nonce;
 
     
-    private function __construct(PowStamp2 $stamp,int $accepted_time,PDO $db, PropertiesRows $ptr,EcdasSignedAccountRootRecord $account, int $required_pow, int $accepted_pow){
-        parent::__construct($stamp,$accepted_time);
+    private function __construct(PowStamp2 $stamp,PowStamp2Message $stamp_message,int $accepted_time,PDO $db, PropertiesRows $ptr,EcdasSignedAccountRootRecord $account, int $required_pow, int $accepted_pow){
+        parent::__construct($stamp,$stamp_message,$accepted_time);
         $this->db = $db;
         $this->account=$account;
         $this->required_pow=$required_pow;
@@ -77,7 +78,7 @@ class PoWAccountRequiredEndpoint extends AStampRequiredEndpoint
         if($latest_hist_rec===false){
             ErrorResponseBuilder::throwResponse(502,message:'This pass is not considerd.',status:405);
         }
-        $latest_stamp=$latest_hist_rec->powstampAsObject();
+        $latest_stamp=$latest_hist_rec->powstampMessageAsObject();
         //Nonceの確認
         if($latest_stamp->getNonceAsU48()>=$stamp->getNonceAsU48()){
             ErrorResponseBuilder::throwResponse(204,'Nonce must be greater than to the current value.',hint:['current'=>$latest_stamp->getNonceAsU48()]);
@@ -93,11 +94,12 @@ class PoWAccountRequiredEndpoint extends AStampRequiredEndpoint
         $required_pow=(int)(min(self::UINT48_MAX,pow(2,48*$rate)));
         // print_r(bin2hex($latest_stamp->getHash()).",\n");
         // print_r(bin2hex($stamp->getHash()).",\n");
-        $powscore48=$stamp->recoverMessage($latest_stamp->getHash(), $rawData)->getPowScoreU48();
+        $psm=$stamp->recoverMessage($latest_stamp->getHash(), $rawData);
+        $powscore48=$psm->getPowScoreU48();
         if($powscore48>=$required_pow){ #PowSdoreは既定よりも大きくなければならない。
             ErrorResponseBuilder::throwResponse(205,"Pow score is high. Received:$powscore48",hint:['required_score'=>$required_pow]);
         }
 
-        return new PoWAccountRequiredEndpoint($stamp,$accepted_time,$db,$pt_rec,$ar_ret,$required_pow,$powscore48);        
+        return new PoWAccountRequiredEndpoint($stamp,$psm,$accepted_time,$db,$pt_rec,$ar_ret,$required_pow,$powscore48);        
     }
 }

@@ -133,7 +133,7 @@ function upload($db,$rawData):IResponseBuilder
     $jsh_table=new JsonStorageHistory($db);
     $js_rec=$js_tbl->selectOrInsertIfNotExist($upload_data);
     // $js_rec=$js_tbl->selectOrInsertIfNotExist($rawData);
-    $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp->stamp,$endpoint->required_pow);
+    $hs_rec=$hs_tbl->insert($endpoint->accepted_time,$ar_rec->id,$endpoint->stamp_message->message,$endpoint->required_pow);
     $jsh_rec=$jsh_table->insert($hs_rec->id,$js_rec->id);    
     //アップデートのバッチ処理/
     
@@ -151,8 +151,8 @@ function upload($db,$rawData):IResponseBuilder
         ],
         "chain"=>[
             "domain"=>"branch",//これは固定
-            "latest_hash"=>bin2hex($endpoint->stamp->getHash()),
-            'nonce'=>$endpoint->stamp->getNonceAsU48(),    
+            "latest_hash"=>bin2hex($endpoint->stamp_message->getHash()),
+            'nonce'=>$endpoint->stamp_message->getNonceAsU48(),    
         ],
         'pow'=>[
             'required'=>$endpoint->required_pow,

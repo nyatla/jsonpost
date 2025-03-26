@@ -52,11 +52,11 @@ try{
             $hrec=HistoryRecord::selectLatestHistoryByAccount($db,$act_rec->id);
             if($hrec!==false){
                 //PowStampのアカウントが存在し、かつフォークを済ませている。
-                $pstamp=$hrec->powstampAsObject();
+                $pstampm=$hrec->powstampMessageAsObject();
                 $chain_json=[
                     'domain'=>'branch',
-                    'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
-                    'nonce'=>$pstamp->getNonceAsU48()
+                    'latest_hash'=>bin2hex($pstampm->getHash()), #ハッシュはblanchのものであるべき
+                    'nonce'=>$pstampm->getNonceAsU48()
                 ];
             }else{
                 //フォークしてるけどHistoryにはない。
@@ -68,11 +68,11 @@ try{
             if($hrec===false){
                 ErrorResponseBuilder::throwResponse(101,message:'This pass is not considerd.',status:405);
             }
-            $pstamp=$hrec->powstampAsObject();
+            $pstampm=$hrec->powstampMessageAsObject();
             $chain_json=[
                 'domain'=>'main',
-                'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
-                'nonce'=>$pstamp->getNonceAsU48()
+                'latest_hash'=>bin2hex($pstampm->getHash()), #ハッシュはblanchのものであるべき
+                'nonce'=>$pstampm->getNonceAsU48()
         ];
         }
     }else{
@@ -81,11 +81,11 @@ try{
             if($hrec===false){
                 ErrorResponseBuilder::throwResponse(101,message:'This pass is not considerd.',status:405);
             }
-            $pstamp=$hrec->powstampAsObject();
+            $pstampm=$hrec->powstampMessageAsObject();
             $chain_json=[
                 'domain'=>'main',
-                'latest_hash'=>bin2hex($pstamp->getHash()), #ハッシュはblanchのものであるべき
-                'nonce'=>$pstamp->getNonceAsU48()
+                'latest_hash'=>bin2hex($pstampm->getHash()), #ハッシュはblanchのものであるべき
+                'nonce'=>$pstampm->getNonceAsU48()
             ];
     }
     $prop_tbl=new PropertiesTable($db);

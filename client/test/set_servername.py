@@ -29,10 +29,12 @@ from jsonpostcl import JsonpostCl
     # #     else:
     # #         parser.print_help()
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --server-name aaa".split(" "))
-# JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[1,0.02,3.0]]".split(" "))
+JsonpostCl.main("setparams http://127.0.0.1:8000/api --pow-algorithm [\"tlsln\",[1,0.02,3.0]]".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --welcome false".split(" "))
-JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-no-schema".split(" "))
+# JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-no-schema".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-schema ./schema.json".split(" "))
-JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-jcs no".split(" "))
+# JsonpostCl.main("setparams http://127.0.0.1:8000/api --json-jcs no".split(" "))
 # JsonpostCl.main("setparams http://127.0.0.1:8000/api".split(" "))
 
+# JsonpostCl.main("setparams https://nyatla.jp/jsonpost/1/server/public/api --json-jcs yes".split(" "))
+# JsonpostCl.main("setparams https://nyatla.jp/jsonpost/1/server/public/api --pow-algorithm [\"tlsln\",[60,1,3.0]]".split(" "))

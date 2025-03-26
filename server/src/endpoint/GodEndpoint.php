@@ -8,6 +8,7 @@ use Jsonpost\db\tables\{EcdasSignedAccountRoot,JsonStorageHistory,HistoryRecord}
 
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
 use Jsonpost\utils\ecdsasigner\PowStamp2;
+use Jsonpost\utils\ecdsasigner\PowStamp2Message;
 
 
 
@@ -38,10 +39,11 @@ class GodEndpoint extends AccountBondEndpoint
             ErrorResponseBuilder::throwResponse(401);//神がいない
         }
 
-        $god_stamp=$god_rec->powstampAsObject();
+        $god_stamp=$god_rec->powstampMessageAsObject();
         //Stampのベリファイ
         // print_r(bin2hex($god_stamp->getHash()));
-        if(!PowStamp2::verify($stamp,$god_stamp->getHash(), $rawData)){
+        $psm=$stamp->recoverMessage($god_stamp->getHash(), $rawData);
+        if(!$stamp->verify($psm)){
             ErrorResponseBuilder::throwResponse(203);//ベリファイ失敗
         }
         
@@ -50,7 +52,7 @@ class GodEndpoint extends AccountBondEndpoint
             ErrorResponseBuilder::throwResponse(204,hint:["current"=>$god_stamp->getNonceAsU48()]);
         }
         return new GodEndpoint(
-            $stamp,
+            $stamp,$psm,
                 $db,
                 $pt,
                 $ar_rec,self::UINT48_MAX

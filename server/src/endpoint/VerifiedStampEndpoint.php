@@ -4,6 +4,8 @@ namespace Jsonpost\endpoint;
 
 
 use Jsonpost\utils\ecdsasigner\PowStamp2;
+use Jsonpost\utils\ecdsasigner\PowStamp2Message;
+use Jsonpost\responsebuilder\ErrorResponseBuilder;
 
 
 /**
@@ -11,8 +13,8 @@ use Jsonpost\utils\ecdsasigner\PowStamp2;
  */
 class VerifiedStampEndpoint extends AStampRequiredEndpoint
 {
-    protected function __construct(PowStamp2 $stamp){
-        parent::__construct(stamp: $stamp);
+    protected function __construct(PowStamp2 $stamp,PowStamp2Message $stamp_message){
+        parent::__construct($stamp,$stamp_message);
     }
 
     /**
@@ -22,7 +24,11 @@ class VerifiedStampEndpoint extends AStampRequiredEndpoint
      * @return VerifiedStampEndpoint
      */
     public static function create(?string $chain_hash=null,?string $rawData=null): VerifiedStampEndpoint{
-        return new VerifiedStampEndpoint(
-            PowStamp2::createVerifiedFromHeader($chain_hash,$rawData));
+        $ps=PowStamp2::createFromHeader();
+        $psm=$ps->recoverMessage($chain_hash,$rawData);
+        if(!$ps->verify($psm)){
+            ErrorResponseBuilder::throwResponse(203);
+        }
+        return new VerifiedStampEndpoint($ps,$psm);
     }
 }

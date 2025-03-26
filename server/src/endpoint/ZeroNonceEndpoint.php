@@ -8,6 +8,7 @@ use Jsonpost\utils\ecdsasigner\PowStamp2;
 
 
 use Jsonpost\responsebuilder\ErrorResponseBuilder;
+use Jsonpost\utils\ecdsasigner\PowStamp2Message;
 
 
 
@@ -18,7 +19,11 @@ use Jsonpost\responsebuilder\ErrorResponseBuilder;
 class ZeroNonceEndpoint extends AccountBondEndpoint
 {
     public static function create($db,string $genesis_hash,string $rawData):ZeroNonceEndpoint{
-        $stamp=PowStamp2::createVerifiedFromHeader($genesis_hash,$rawData);
+        $stamp=PowStamp2::createFromHeader();
+        $stamp_message=$stamp->recoverMessage($genesis_hash,$rawData);
+        if(!$stamp->verify($stamp_message)){
+            ErrorResponseBuilder::throwResponse(203);
+        }
         //データベースが存在しないときだけ生成できる
         $ar_tbl=new EcdasSignedAccountRoot($db);
         $ar_ret=$ar_tbl->selectOrInsertIfNotExist($stamp->getEcdsaPubkey());
@@ -29,8 +34,9 @@ class ZeroNonceEndpoint extends AccountBondEndpoint
             ErrorResponseBuilder::throwResponse(204,hint:[]);
         } 
         return new ZeroNonceEndpoint(
-                $stamp,
-                $db,
+            $stamp,
+            $stamp_message,
+            $db,
                 new PropertiesTable($db),
                 $ar_ret,0xffffffff
         );
